@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MaxAcres.com — Portfolio Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg2: #f6f6f4;
+    --bg3: #efefed;
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --text3: #9b9a94;
+    --border: rgba(0,0,0,0.1);
+    --border2: rgba(0,0,0,0.18);
+    --r-md: 8px;
+    --r-lg: 12px;
+    --red-bg: #fcebeb; --red-text: #a32d2d; --red-border: #e24b4a;
+    --amber-bg: #faeeda; --amber-text: #854f0b; --amber-border: #ef9f27;
+    --green-bg: #eaf3de; --green-text: #3b6d11; --green-border: #639922;
+    --blue-bg: #e6f1fb; --blue-text: #185fa5; --blue-border: #378add;
+    --purple-bg: #eeedfe; --purple-text: #534ab7;
+    --teal-bg: #e1f5ee; --teal-text: #0f6e56;
+    --score-size: 38px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e1c; --bg2: #272725; --bg3: #313130;
+      --text: #e8e8e4; --text2: #9b9a94; --text3: #6b6b67;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+      --red-bg: #3d1010; --red-text: #f09595;
+      --amber-bg: #3d2800; --amber-text: #fac775;
+      --green-bg: #172806; --green-text: #c0dd97;
+      --blue-bg: #0a2240; --blue-text: #85b7eb;
+      --purple-bg: #1e1b40; --purple-text: #afa9ec;
+      --teal-bg: #052820; --teal-text: #5dcaa5;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 13px; background: var(--bg3); color: var(--text); min-height: 100vh; }
+
+  /* ── TOP BAR ── */
+  .topbar { background: var(--bg); border-bottom: 0.5px solid var(--border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 52px; position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+  .logo span { color: var(--blue-text); }
+  .topbar-right { font-size: 11px; color: var(--text3); }
+
+  /* ── MAIN LAYOUT ── */
+  .main { max-width: 1400px; margin: 0 auto; padding: 20px 24px; }
+
+  /* ── UPLOAD ── */
+  .upload-row { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .upload-zone { background: var(--bg); border: 1.5px dashed var(--border2); border-radius: var(--r-lg); padding: 20px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .upload-zone:hover { background: var(--bg2); border-color: var(--blue-border); }
+  .upload-zone.loaded .uz-icon { display: none; }
+  .upload-zone.loaded .uz-sub { display: none; }
+  .upload-zone.loaded .uz-btn { display: none; }
+  .upload-zone.loaded { padding: 10px 16px; text-align: left; display: flex; align-items: center; gap: 10px; }
+  .upload-zone.loaded .uz-title { font-size: 12px; margin: 0; }
+  .upload-zone.loaded .uz-status { margin: 0; }
+  .upload-zone input { display: none; }
+  .uz-icon { width: 32px; height: 32px; margin: 0 auto 8px; background: var(--bg2); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .uz-icon svg { width: 16px; height: 16px; }
+  .uz-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+  .uz-sub { font-size: 11px; color: var(--text3); }
+  .uz-btn { margin-top: 10px; font-size: 11px; padding: 5px 14px; border-radius: var(--r-md); border: 0.5px solid var(--border2); background: transparent; color: var(--text); cursor: pointer; }
+  .uz-btn:hover { background: var(--bg2); }
+  .uz-status { font-size: 11px; color: var(--green-text); margin-top: 6px; min-height: 16px; font-weight: 500; }
+
+  /* ── SUMMARY BAR ── */
+  .summary-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 10px; margin-bottom: 16px; }
+  .sm { background: var(--bg); border-radius: var(--r-md); padding: 12px 16px; min-height: 72px; display: flex; flex-direction: column; justify-content: center; }
+  .sm-filter { cursor: pointer; transition: all 0.15s; border: 1.5px solid transparent; }
+  .sm-filter:hover { border-color: var(--amber-border); background: var(--amber-bg); }
+  .sm-active { border-color: var(--amber-border) !important; background: var(--amber-bg) !important; }
+  .sm-v { font-size: 22px; font-weight: 600; color: var(--text); }
+  .sm-l { font-size: 10px; color: var(--text3); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .sm-v.red { color: var(--red-text); } .sm-v.amber { color: var(--amber-text); } .sm-v.green { color: var(--green-text); }
+
+  /* ── FILTERS ── */
+  .filter-section { background: var(--bg); border-radius: var(--r-md); padding: 10px 14px; margin-bottom: 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .filter-label { font-size: 10px; color: var(--text); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 4px; font-weight: 700; }
+  .filter-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+  .fb { font-size: 11px; padding: 4px 10px; border-radius: var(--r-md); border: 0.5px solid var(--border2); background: transparent; color: var(--text3); cursor: pointer; transition: all 0.1s; }
+  .fb:hover { background: var(--bg2); color: var(--text2); }
+  .fb.on { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); font-weight: 600; }
+
+  /* ── TABLE ── */
+  .table-wrap { background: var(--bg); border-radius: var(--r-lg); overflow: hidden; margin-bottom: 16px; }
+  .tile-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+  @media (max-width: 1100px) { .tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 700px) { .tile-grid { grid-template-columns: 1fr; } }
+  .tile { background: var(--bg); border-radius: var(--r-lg); padding: 20px; cursor: pointer; border: 1.5px solid var(--border); transition: border-color 0.15s, transform 0.1s; }
+  .tile:hover { border-color: var(--blue-border); transform: translateY(-1px); }
+  .tile.active { border-color: var(--blue-border); border-width: 2px; }
+  .tile.tile-urgent { border-left: 4px solid var(--red-border); }
+  .tile.tile-watch { border-left: 4px solid var(--amber-border); }
+  .tile.tile-good { border-left: 4px solid var(--green-border); }
+  .tile-addr { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.2; margin-bottom: 4px; }
+  .tile-sub { font-size: 14px; color: var(--text3); margin-bottom: 14px; }
+  .tile-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .tile-metric { background: var(--bg2); border-radius: var(--r-md); padding: 8px 10px; }
+  .tile-ml { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px; }
+  .tile-mv { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.1; }
+  .tile-ms { font-size: 11px; color: var(--text3); margin-top: 1px; }
+  .tile-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .tile-stat { text-align: center; }
+  .tile-stat-v { font-size: 28px; font-weight: 700; color: var(--text); }
+  .tile-stat-l { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; }
+  .tile-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding-top: 10px; border-top: 0.5px solid var(--border); }
+  .tile-flags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tbl th { font-size: 10px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 10px; text-align: left; border-bottom: 0.5px solid var(--border); white-space: nowrap; background: var(--bg2); }
+  .tbl td { padding: 9px 10px; border-bottom: 0.5px solid var(--border); vertical-align: middle; }
+  .tbl tr.dr:hover td { background: var(--bg2); cursor: pointer; }
+  .tbl tr.dr.active td { background: var(--blue-bg); }
+  .prop-name { font-size: 12px; font-weight: 500; color: var(--text); }
+  .prop-sub { font-size: 10px; color: var(--text3); margin-top: 1px; }
+
+  /* ── BADGES ── */
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; white-space: nowrap; display: inline-block; line-height: 1.4; }
+  .b-r { background: var(--red-bg); color: var(--red-text); }
+  .b-a { background: var(--amber-bg); color: var(--amber-text); }
+  .b-g { background: var(--green-bg); color: var(--green-text); }
+  .b-bl { background: var(--blue-bg); color: var(--blue-text); }
+  .b-p { background: var(--purple-bg); color: var(--purple-text); }
+  .b-teal { background: var(--teal-bg); color: var(--teal-text); }
+  .b-gr { background: var(--bg2); color: var(--text2); border: 0.5px solid var(--border); }
+
+  /* ── SCORE RING ── */
+  .score-ring { display: inline-flex; align-items: center; justify-content: center; width: var(--score-size); height: var(--score-size); border-radius: 50%; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+  .sr-r { background: var(--red-bg); color: var(--red-text); border: 2px solid var(--red-border); }
+  .sr-a { background: var(--amber-bg); color: var(--amber-text); border: 2px solid var(--amber-border); }
+  .sr-g { background: var(--green-bg); color: var(--green-text); border: 2px solid var(--green-border); }
+
+  /* ── PIPELINE BAR ── */
+  .pip { display: flex; gap: 2px; }
+  .pp { height: 5px; border-radius: 2px; width: 13px; background: var(--border2); }
+  .pf { background: var(--blue-border); } .pa { background: var(--green-border); }
+
+  /* ── COLOR UTILS ── */
+  .red { color: var(--red-text); } .amber { color: var(--amber-text); } .green { color: var(--green-text); }
+  .muted { color: var(--text3); }
+
+  /* ── PROPERTY CARD ── */
+  .card-wrap { background: var(--bg); border-radius: var(--r-lg); overflow: hidden; margin-bottom: 24px; border: 0.5px solid var(--border); }
+  .card-head { padding: 24px 28px 20px; border-bottom: 0.5px solid var(--border); background: var(--bg); }
+  .card-addr { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .card-meta { font-size: 11px; color: var(--text2); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+  .card-meta .sep { color: var(--border2); }
+  .card-badges { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .card-body { padding: 0; }
+
+  /* ── CARD SECTIONS ── */
+  .sec { padding: 16px 24px; border-bottom: 0.5px solid var(--border); }
+  .sec:last-child { border-bottom: none; }
+  .sec-title { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+
+  /* ── METRIC GRIDS ── */
+  .g5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .mt8 { margin-top: 8px; }
+  .mc { background: var(--bg2); border-radius: var(--r-md); padding: 10px 14px; }
+  .mc-l { font-size: 10px; color: var(--text3); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .mc-v { font-size: 18px; font-weight: 600; color: var(--text); line-height: 1.2; }
+  .mc-s { font-size: 10px; color: var(--text3); margin-top: 3px; }
+
+  /* ── PANEL BOXES ── */
+  .panel-box { background: var(--bg2); border-radius: var(--r-md); padding: 12px 14px; }
+  .panel-title { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 0.5px solid var(--border); }
+  .drow { display: flex; justify-content: space-between; align-items: flex-start; padding: 4px 0; border-bottom: 0.5px solid var(--border); }
+  .drow:last-child { border-bottom: none; }
+  .drl { font-size: 11px; color: var(--text2); }
+  .drv { font-size: 11px; font-weight: 500; color: var(--text); text-align: right; max-width: 58%; word-break: break-word; }
+
+  /* ── CHARTS ── */
+  .chart-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .chart-box { background: var(--bg2); border-radius: var(--r-md); padding: 12px 14px; }
+  .chart-title { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 10px; }
+
+  /* ── RECOMMENDATION BAR ── */
+  .rec-bar { border-radius: var(--r-md); border-left: 3px solid var(--red-border); padding: 12px 16px; background: var(--bg2); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .rec-bar.wa { border-left-color: var(--amber-border); }
+  .rec-bar.go { border-left-color: var(--green-border); }
+  .rec-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 3px; }
+  .rec-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+  .engine-btn { font-size: 11px; padding: 6px 14px; border-radius: var(--r-md); border: 0.5px solid var(--blue-border); background: var(--blue-bg); color: var(--blue-text); cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .engine-btn:hover { opacity: 0.85; }
+
+  /* ── MKTG CHIPS ── */
+  .mktg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+
+  /* ── DATA TABLES ── */
+  .data-tbl-wrap { background: var(--bg2); border-radius: var(--r-md); overflow: hidden; }
+  .data-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .data-tbl th { font-size: 10px; color: var(--text3); padding: 8px 10px; text-align: left; border-bottom: 0.5px solid var(--border); font-weight: 500; white-space: nowrap; background: var(--bg3); }
+  .data-tbl td { padding: 7px 10px; border-bottom: 0.5px solid var(--border); vertical-align: top; color: var(--text); line-height: 1.45; }
+  .data-tbl tr:last-child td { border-bottom: none; }
+  .data-tbl tr:nth-child(even) td { background: var(--bg3); }
+  .no-data { font-size: 11px; color: var(--text3); font-style: italic; padding: 16px; text-align: center; }
+  .hot { color: var(--red-text); font-weight: 600; }
+  .warm { color: var(--amber-text); font-weight: 500; }
+  .cold { color: var(--blue-text); }
+  .backed { color: var(--text3); }
+  .uc { color: var(--green-text); font-weight: 600; }
+
+  /* ── CLOSE BAR ── */
+  .close-bar { padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; border-top: 0.5px solid var(--border); background: var(--bg2); }
+  .close-btn { font-size: 11px; padding: 6px 14px; border-radius: var(--r-md); border: 0.5px solid var(--border2); background: var(--bg); color: var(--text2); cursor: pointer; }
+  .close-btn:hover { background: var(--bg3); }
+  .close-meta { font-size: 10px; color: var(--text3); }
+
+  /* ── EMPTY STATE ── */
+  .empty { text-align: center; padding: 60px 24px; color: var(--text3); }
+  .empty-title { font-size: 16px; font-weight: 500; color: var(--text2); margin-bottom: 8px; }
+  .empty-sub { font-size: 13px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .g5 { grid-template-columns: repeat(3, 1fr); }
+    .g4 { grid-template-columns: repeat(2, 1fr); }
+    .g3 { grid-template-columns: repeat(2, 1fr); }
+    .summary-bar { grid-template-columns: repeat(3, 1fr); }
+    .chart-pair { grid-template-columns: 1fr; }
+    .upload-row { grid-template-columns: 1fr; }  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo"><span>MaxAcres.com</span> &nbsp;·&nbsp; Portfolio Dashboard</div>
+  <div class="topbar-right" id="topbarMeta"></div>
+</div>
+
+<div class="main">
+
+  <!-- UPLOAD -->
+  <div class="upload-row" id="uploadRow">
+    <div class="upload-zone" id="uz1" onclick="document.getElementById('f1').click()">
+      <input type="file" id="f1" accept=".xlsx,.xls,.csv">
+      <div class="uz-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 13h10M8 3v7M5 6l3-3 3 3"/>
+        </svg>
+      </div>
+      <div class="uz-title" id="uz1t">Salesforce portfolio report</div>
+      <div class="uz-sub">Weekly Excel export — 47 fields per listing</div>
+      <button class="uz-btn" onclick="event.stopPropagation()">Choose file</button>
+      <div class="uz-status" id="s1"></div>
+    </div>
+    <div class="upload-zone" id="uz3" onclick="document.getElementById('f3').click()">
+      <input type="file" id="f3" accept=".xlsx,.xls,.csv">
+      <div class="uz-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 13h10M8 3v7M5 6l3-3 3 3"/>
+        </svg>
+      </div>
+      <div class="uz-title" id="uz3t">Outbound campaigns report</div>
+      <div class="uz-sub">Salesforce outbound campaigns + leads export</div>
+      <button class="uz-btn" onclick="event.stopPropagation()">Choose file</button>
+      <div class="uz-status" id="s3"></div>
+    </div>
+    <div class="upload-zone" id="uz4" onclick="document.getElementById('f4').click()">
+      <input type="file" id="f4" accept=".xlsx,.xls,.csv">
+      <div class="uz-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 13h10M8 3v7M5 6l3-3 3 3"/>
+        </svg>
+      </div>
+      <div class="uz-title" id="uz4t">Price drop report</div>
+      <div class="uz-sub">Live listings price drop history export</div>
+      <button class="uz-btn" onclick="event.stopPropagation()">Choose file</button>
+      <div class="uz-status" id="s4"></div>
+    </div>
+    <div class="upload-zone" id="uz5" onclick="document.getElementById('f5').click()">
+      <input type="file" id="f5" accept=".xlsx,.xls,.csv">
+      <div class="uz-icon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 13h10M8 3v7M5 6l3-3 3 3"/>
+        </svg>
+      </div>
+      <div class="uz-title" id="uz5t">Zillow data</div>
+      <div class="uz-sub">Weekly saves, views + DOM — exported from Claude parser</div>
+      <button class="uz-btn" onclick="event.stopPropagation()">Choose file</button>
+      <div class="uz-status" id="s5"></div>
+    </div>
+  </div>
+
+  <!-- PORTFOLIO -->
+  <div id="portfolioSection" style="display:none">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+      <button id="clearFiltersBtn" onclick="clearAllFilters()" style="font-size:11px;padding:5px 12px;border-radius:var(--r-md);border:0.5px solid var(--border2);background:var(--bg);color:var(--text3);cursor:pointer;transition:all 0.15s" onmouseover="this.style.color='var(--red-text)';this.style.borderColor='var(--red-border)';this.style.background='var(--red-bg)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border2)';this.style.background='var(--bg)'">✕ Clear all filters</button>
+    </div>
+    <div class="filter-section">
+      <span class="filter-label">Stage</span>
+      <button class="fb stage-btn stage-all-btn on" onclick="fstage('all',this)">All</button>
+      <button class="fb stage-btn" onclick="fstage('Clear to Flip',this)">Clear to flip</button>
+      <button class="fb stage-btn" onclick="fstage('TAH - Owned',this)">TAH owned</button>
+      <button class="fb stage-btn" onclick="fstage('Due Diligence',this)">Due diligence</button>
+      <button class="fb stage-btn" onclick="fstage('At Closing',this)">At closing</button>
+      <button class="fb stage-btn" onclick="fstage('Clearing to Close',this)">Clearing to close</button>
+    </div>
+    <div class="filter-section">
+      <span class="filter-label">LEI</span>
+      <button class="fb on" onclick="fpei('all',this)">All</button>
+      <button class="fb" onclick="fpei('optimal',this)">Optimal 90%+</button>
+      <button class="fb" onclick="fpei('strong',this)">Strong 70–89%</button>
+      <button class="fb" onclick="fpei('moderate',this)">Moderate 50–69%</button>
+      <button class="fb" onclick="fpei('subpar',this)">Sub-Par 30–49%</button>
+      <button class="fb" onclick="fpei('poor',this)">Poor &lt;30%</button>
+    </div>
+    <div class="filter-section" id="titleFilterRow" style="display:none">
+      <span class="filter-label">Title status</span>
+      <button class="fb title-btn title-all-btn on" onclick="ftitle('all',this)">All</button>
+      <span id="titleButtons"></span>
+    </div>
+    <div class="filter-section">
+      <span class="filter-label">Expiry</span>
+      <button class="fb on" onclick="fexpiry('all',this)">All</button>
+      <button class="fb" onclick="fexpiry('critical',this)">Under 15 days</button>
+      <button class="fb" onclick="fexpiry('urgent',this)">15–30 days</button>
+      <button class="fb" onclick="fexpiry('watch',this)">30–60 days</button>
+      <button class="fb" onclick="fexpiry('good',this)">60+ days</button>
+    </div>
+    <div class="filter-section">
+      <span class="filter-label">Price drops</span>
+      <button class="fb on" onclick="fdrops('all',this)">All</button>
+      <button class="fb" onclick="fdrops('0',this)">0</button>
+      <button class="fb" onclick="fdrops('1',this)">1</button>
+      <button class="fb" onclick="fdrops('2',this)">2</button>
+      <button class="fb" onclick="fdrops('3',this)">3</button>
+      <button class="fb" onclick="fdrops('4',this)">4</button>
+      <button class="fb" onclick="fdrops('5+',this)">5+</button>
+    </div>
+    <div class="filter-section">
+      <span class="filter-label">Last drop age</span>
+      <button class="fb on" onclick="fdropAge('all',this)">All</button>
+      <button class="fb" onclick="fdropAge('lt7',this)">&lt;7 days</button>
+      <button class="fb" onclick="fdropAge('7to15',this)">7–15 days</button>
+      <button class="fb" onclick="fdropAge('15to30',this)">15–30 days</button>
+      <button class="fb" onclick="fdropAge('30to60',this)">30–60 days</button>
+      <button class="fb" onclick="fdropAge('gt60',this)">&gt;60 days</button>
+    </div>
+    <div class="filter-section" id="stateFilterRow" style="display:none">
+      <span class="filter-label">State</span>
+      <button class="fb state-btn state-all-btn on" onclick="fstate('all',this)">All</button>
+      <span id="stateButtons"></span>
+    </div>
+    <div class="filter-section">
+      <span class="filter-label">POD</span>
+      <button class="fb on" onclick="fpod('all',this)">All</button>
+      <button class="fb" onclick="fpod('Jose',this)">Jose</button>
+      <button class="fb" onclick="fpod('Gabriel',this)">Gabriel</button>
+    </div>
+    <div class="summary-bar" id="summaryBar"></div>
+    <div class="table-wrap">
+      <table class="tbl">
+        <thead><tr>
+          <th>Property</th><th>Listing ID</th><th>LandID</th><th>LEI</th>
+          <th>Contract price</th><th>List price</th><th>Price Age</th><th>Spread</th>
+          <th>DOM</th><th>Expiry</th>
+          <th>ZViews</th><th>ZSaves</th><th>Incoming</th><th>Outgoing (BB/RT/IV/NG)</th>
+        </tr></thead>
+        <tbody id="portfolioBody"></tbody>
+      </table>
+    </div>
+    <div id="cardArea"></div>
+  </div>
+
+  <!-- EMPTY -->
+  <div class="empty" id="emptyState">
+    <div class="empty-title">Upload your Salesforce report to get started</div>
+    <div class="empty-sub">Drop both files above — portfolio loads instantly</div>
+  </div>
+
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let listings = [], camps = [], fbacks = [], outboundLeads = [], priceDropData = [], zillowData = [];
+let sfOk = false, actOk = false, campOk = false, pdOk = false, zillowOk = false;
+let podFilter = 'all', stageFilter = [], expiryFilter = 'all', stateFilter = [], titleFilter = [], peiFilter = 'all', dropsFilter = 'all', dropAgeFilter = 'all';
+let priceStaleFilter = false, noMlsFilter = false;
+let activeCardId = null;
+const activeCharts = {};
+
+// ── FILE UPLOAD ─────────────────────────────────────────────────────────────
+document.getElementById('f1').onchange = e => readFile(e.target.files[0], 'sf');
+document.getElementById('f3').onchange = e => readFile(e.target.files[0], 'camp');
+document.getElementById('f4').onchange = e => readFile(e.target.files[0], 'pd');
+document.getElementById('f5').onchange = e => readFile(e.target.files[0], 'zillow');
+
+['uz1','uz3','uz4','uz5'].forEach((id, i) => {
+  const z = document.getElementById(id);
+  z.addEventListener('dragover', e => { e.preventDefault(); z.style.borderColor = 'var(--blue-border)'; });
+  z.addEventListener('dragleave', () => { z.style.borderColor = ''; });
+  z.addEventListener('drop', e => { e.preventDefault(); z.style.borderColor = ''; const f = e.dataTransfer.files[0]; if (f) readFile(f, ['sf','camp','pd','zillow'][i]); });
+});
+
+function readFile(file, type) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+    if (type === 'sf') {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: null });
+      listings = rows.map(parseRow).filter(Boolean);
+      sfOk = true;
+      if (pdOk) enrichListingsFromPriceDrop();
+      if (campOk) enrichListingsFromCampaigns();
+      if (zillowOk) enrichListingsFromZillow();
+      document.getElementById('s1').textContent = '✓ ' + listings.length + ' listings loaded';
+      document.getElementById('uz1').classList.add('loaded');
+      document.getElementById('uz1t').textContent = file.name;
+    } else if (type === 'camp') {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: null });
+      outboundLeads = rows.filter(r => gv(r, 'The Market Hub #', 'Market Hub'));
+      campOk = true;
+      document.getElementById('s3').textContent = '✓ ' + outboundLeads.length + ' campaign leads loaded';
+      document.getElementById('uz3').classList.add('loaded');
+      document.getElementById('uz3t').textContent = file.name;
+      if (sfOk) { enrichListingsFromCampaigns(); renderPortfolio(); if (activeCardId) showCard(activeCardId); }
+    } else if (type === 'pd') {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: null });
+      priceDropData = rows.filter(r => gv(r, 'Listing #', 'listing #'));
+      pdOk = true;
+      document.getElementById('s4').textContent = '✓ ' + priceDropData.length + ' listings with price history';
+      document.getElementById('uz4').classList.add('loaded');
+      document.getElementById('uz4t').textContent = file.name;
+      if (sfOk) { enrichListingsWithPriceData(); renderPortfolio(); if (activeCardId) showCard(activeCardId); }
+    } else if (type === 'zillow') {
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: null });
+      zillowData = rows.filter(r => gv(r, 'Listing #', 'listing #'));
+      zillowOk = true;
+      document.getElementById('s5').textContent = '✓ ' + zillowData.length + ' listings with Zillow data';
+      document.getElementById('uz5').classList.add('loaded');
+      document.getElementById('uz5t').textContent = file.name;
+      if (sfOk) { enrichListingsFromZillow(); renderPortfolio(); if (activeCardId) showCard(activeCardId); }
+    }
+    if (sfOk) {
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('portfolioSection').style.display = 'block';
+      document.getElementById('uploadRow').style.marginBottom = '0';
+      enrichListingsWithPriceData();
+      document.getElementById('topbarMeta').textContent = '';
+      buildStateButtons();
+      buildTitleButtons();
+      renderPortfolio();
+    }
+    if ((campOk || pdOk || zillowOk) && activeCardId) showCard(activeCardId);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── DATA PARSING ──────────────────────────────────────────────────────────
+function gv(row, ...keys) {
+  for (const k of keys)
+    for (const col of Object.keys(row))
+      if (col.toLowerCase().trim() === k.toLowerCase().trim() && row[col] !== null && row[col] !== undefined && row[col] !== '')
+        return row[col];
+  return null;
+}
+
+function parseRow(row) {
+  const id = gv(row, 'The Sales Hub', 'Sales Hub', 'SH ID'); if (!id) return null;
+  const n = v => parseFloat(v) || null;
+  const i = v => parseInt(v) || 0;
+  const b = v => (v || '').toString().toLowerCase() === 'yes';
+  const listP = n(gv(row, 'Current Cash Price'));
+  const contractP = parseFloat(gv(row, 'Under Contract Price')) || 0;
+  return {
+    id, addr: gv(row, 'Property Address') || '', state: gv(row, 'State') || '', county: gv(row, 'County') || '',
+    type: gv(row, 'Property Type') || '', size: gv(row, 'Total Property Size') || '',
+    pod: gv(row, 'POD') || '', stage: gv(row, 'Transaction Stage') || '',
+    landId: gv(row, 'LandID Link', 'LandID', 'Land ID', 'Land Id', 'landid') || '',
+    mainListing: gv(row, 'Main Listing', 'main listing') || '',
+    sfPropertyId: gv(row, 'Salesforce Record ID', 'SF Record ID', 'Record ID', 'Property ID') || '',
+    sellerName: gv(row, 'Seller Name', 'Seller', 'Owner Name', 'Owner') || '',
+    txn: gv(row, 'Transaction') || '', listingId: gv(row, 'MLS') || '', websiteId: gv(row, 'Website') || '',
+    ppp: gv(row, 'PPP: PPP Name') || '', cpi: gv(row, 'CPI') || '', lds: n(gv(row, 'LDS')),
+    listP, contractP, spread: listP !== null ? listP - contractP : null,
+    lastListP: n(gv(row, 'Last Cash List Price')), profit: n(gv(row, 'Potential Profit')),
+    equity: n(gv(row, 'Equity Capture')), pricePct: parseFloat(gv(row, 'Price Drop %')) || 0,
+    saves: n(gv(row, 'Zillow Saves')), zViews: n(gv(row, 'Zillow Views', 'ZViews', 'Zillow_Views')), mlsSaves: n(gv(row, 'MLS Saves')),
+    zillowLink: gv(row, 'Zillow Link', 'Zillow URL', 'zillow link') || '',
+    dom: n(gv(row, 'MLS DOM')), webDom: n(gv(row, 'Website DOM')),
+    expiry: n(gv(row, '# of Days to Expiration')), drops: i(gv(row, '# of Price Drops')),
+    daysDrop: n(gv(row, '# of Days from Last Price Update')), dropDate: gv(row, 'Price Drop Date') || '',
+    contractDate: gv(row, 'Seller Contract Signed Date') || '', daysUnder: n(gv(row, 'Days Under Contract')),
+    dd: gv(row, 'Property DD Status') || '', title: gv(row, 'Title Status') || '',
+    listingStatus: gv(row, 'Listing Status') || '',
+    mls: b(gv(row, 'Listed on MLS')), fb: b(gv(row, 'Listed on FB?')),
+    neighbor: b(gv(row, 'Neighbor Campaign Complete', 'Neighbor Campaign')), drone: b(gv(row, 'Drone')), ground: b(gv(row, 'Ground Photo')),
+    signBoards: b(gv(row, 'Sign Boards', 'Sign Board', 'Signboards', 'Signs')),
+    sourced: i(gv(row, 'Total Sourced Leads')), appt: i(gv(row, 'Total Appt Set')),
+    qual: i(gv(row, 'Total Qualified Leads')), neg: i(gv(row, 'Total Negotiating')),
+    contractInit: i(gv(row, 'Total Contract Initiated')), noEmd: i(gv(row, 'Total w/o EMD')),
+    emd: i(gv(row, 'Total w/ EMD')),
+    origPrice: null,
+    // Inbound by channel
+    inMls:  { sourced: i(gv(row,'MLS - Sourced')), appt: i(gv(row,'MLS - Appt Set')), qual: i(gv(row,'MLS - Qualified')), noEmd: i(gv(row,'MLS - w/o EMD')), emd: i(gv(row,'MLS - w/ EMD')) },
+    inFb:   { sourced: i(gv(row,'FB (in-house) - Sourced')), appt: i(gv(row,'FB Mkt (in-house) - Appt Set')), qual: i(gv(row,'FB Mkt (in-house) - Qualified')), noEmd: i(gv(row,'FB Mkt (in-house) - w/o EMD')), emd: i(gv(row,'FB Mkt (in-house) - w/ EMD')) },
+    inWeb:  { sourced: i(gv(row,'MaxAcres.com - Sourced')), appt: i(gv(row,'MaxAcres.com - Appt Set')), qual: i(gv(row,'MaxAcres.com - Qualified')), noEmd: i(gv(row,'MaxAcres.com - w/o EMD')), emd: i(gv(row,'MaxAcres.com - w/ EMD')) },
+    inSign: { sourced: i(gv(row,'Sign Board - Sourced')), appt: i(gv(row,'Sign Board - Appt Set')), qual: i(gv(row,'Sign Board - Qualified')), noEmd: i(gv(row,'Sign Board - w/o EMD')), emd: i(gv(row,'Sign Board - w/ EMD')) },
+    inRealtor:  { sourced: i(gv(row,'Realtor - Sourced')), appt: i(gv(row,'Realtor - Appt Set')), qual: i(gv(row,'Realtor - Qualified')), noEmd: i(gv(row,'Realtor - w/o EMD')), emd: i(gv(row,'Realtor - w/ EMD')) },
+    inInvestor: { sourced: i(gv(row,'Investor Base - Sourced')), appt: i(gv(row,'Investor Base - Appt Set')), qual: i(gv(row,'Investor Base - Qualified')), noEmd: i(gv(row,'Investor Base - w/o EMD')), emd: i(gv(row,'Investor Base - w/ EMD')) },
+    inBuyer:    { sourced: i(gv(row,'Buyer Base - Sourced')), appt: i(gv(row,'Buyer Base - Appt Set')), qual: i(gv(row,'Buyer Base - Qualified')), noEmd: i(gv(row,'Buyer Base - w/o EMD')), emd: i(gv(row,'Buyer Base - w/ EMD')) },
+    inNeighbor: { sourced: i(gv(row,'Neighbor - Sourced')), appt: i(gv(row,'Neighbor - Appt Set')), qual: i(gv(row,'Neighbor - Qualified')), noEmd: i(gv(row,'Neighbor - w/o EMD')), emd: i(gv(row,'Neighbor - w/ EMD')) }
+  };
+}
+
+function enrichListingsFromPriceDrop() {
+  listings.forEach(l => {
+    const pd = l.mainListing ? getPriceDrop(l.mainListing) : null;
+    if (!pd) return;
+    const n = v => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? parseFloat(v) : null;
+    const history = parsePriceDropHistory(pd);
+    const drops = history.filter(d => d.label !== 'Original');
+
+    if (n(pd['Current Cash Price'])) l.listP = n(pd['Current Cash Price']);
+    if (n(pd['Original Cash Price'])) l.origPrice = n(pd['Original Cash Price']);
+    if (n(pd['Under Contract Price'])) l.contractP = n(pd['Under Contract Price']);
+    if (n(pd['Profit']) !== null) l.profit = n(pd['Profit']);
+    if (drops.length >= 2) l.lastListP = drops[drops.length - 2].price;
+    l.drops = drops.length;
+    if (pd['Date of Last Price Update']) {
+      l.dropDate = pd['Date of Last Price Update'];
+      const d = new Date(pd['Date of Last Price Update']);
+      if (!isNaN(d)) l.daysDrop = Math.round((new Date() - d) / 86400000);
+    }
+    if (l.origPrice && l.listP) l.pricePct = (l.origPrice - l.listP) / l.origPrice;
+    l.spread = l.listP !== null ? l.listP - l.contractP : null;
+  });
+}
+
+function enrichListingsFromZillow() {
+  if (!zillowOk || zillowData.length === 0) return;
+  listings.forEach(l => {
+    if (!l.mainListing) return;
+    const zrow = zillowData.find(r => (gv(r, 'Listing #') || '').toString().trim() === l.mainListing.toString().trim());
+    if (!zrow) return;
+    const n = v => (v !== null && v !== undefined && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v) : null;
+    if (n(zrow['Zillow Saves']) !== null) l.saves = n(zrow['Zillow Saves']);
+    if (n(zrow['Zillow Views']) !== null) l.zViews = n(zrow['Zillow Views']);
+    if (n(zrow['MLS DOM']) !== null) l.dom = n(zrow['MLS DOM']);
+    if (zrow['Zillow Link'] && !l.zillowLink) l.zillowLink = zrow['Zillow Link'];
+    if (zrow['Date Captured']) l.zillowCaptured = zrow['Date Captured'];
+  });
+}
+
+function enrichListingsWithPriceData() {
+  enrichListingsFromPriceDrop();
+  enrichListingsFromCampaigns();
+  enrichListingsFromZillow();
+}
+
+function enrichListingsFromCampaigns() {
+  if (!campOk || outboundLeads.length === 0) return;
+  listings.forEach(l => {
+    if (!l.mainListing) return;
+    const leads = getOutboundLeads(l.mainListing);
+    if (leads.length === 0) return;
+    l.sourced = leads.reduce((s, r) => s + (parseInt(r['Sourced']) || 0), 0);
+    l.appt = leads.reduce((s, r) => s + (parseInt(r['Appointment Set']) || 0), 0);
+    l.qual = leads.reduce((s, r) => s + (parseInt(r['Qualified']) || 0), 0);
+    l.contractInit = leads.reduce((s, r) => s + (parseInt(r['Contract Sent']) || 0), 0);
+    l.emd = leads.reduce((s, r) => s + (parseInt(r['UC w/ EMD']) || 0), 0);
+    l.noEmd = l.sourced - l.emd;
+  });
+}
+
+function getPdFields(l) {
+  // l is already enriched by enrichListingsFromPriceDrop — just return its current values
+  return {
+    listP: l.listP,
+    lastListP: l.lastListP,
+    drops: l.drops,
+    lastDropDate: l.dropDate,
+    origPrice: l.origPrice || null,
+    pricePct: l.pricePct,
+    profit: l.profit,
+    contractP: l.contractP
+  };
+}
+
+function getPriceDrop(mainListing) {
+  return priceDropData.find(r => (gv(r, 'Listing #') || '').toString().trim() === mainListing.toString().trim()) || null;
+}
+
+function parsePriceDropHistory(pd) {
+  if (!pd) return [];
+  const drops = [];
+  const n = v => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? parseFloat(v) : null;
+
+  // Original price
+  if (n(pd['Original Cash Price'])) {
+    drops.push({ date: null, price: n(pd['Original Cash Price']), label: 'Original' });
+  }
+
+  // PD 1 — uses 'Proposed Price Drop Date' (no number suffix)
+  if (n(pd['PD 1 Cash Price']) && pd['Proposed Price Drop Date']) {
+    drops.push({ date: pd['Proposed Price Drop Date'], price: n(pd['PD 1 Cash Price']), label: 'Drop 1' });
+  }
+
+  // PD 2–5 — use 'Proposed Price Drop Date 2' through '5'
+  for (let i = 2; i <= 5; i++) {
+    const dateKey = `Proposed Price Drop Date ${i}`;
+    const priceKey = `PD ${i} Cash Price`;
+    if (n(pd[priceKey]) && pd[dateKey]) {
+      drops.push({ date: pd[dateKey], price: n(pd[priceKey]), label: `Drop ${i}` });
+    }
+  }
+
+  // Final drop
+  if (n(pd['Final PD Cash Price']) && pd['Proposed Final Price Drop Date']) {
+    drops.push({ date: pd['Proposed Final Price Drop Date'], price: n(pd['Final PD Cash Price']), label: 'Final' });
+  }
+
+  return drops;
+}
+
+function getCamps(id) { return camps.filter(r => (gv(r,'SH ID','sh id') || '').toString().trim() === id.toString().trim()); }
+function getFbacks(id) { return fbacks.filter(r => (gv(r,'SH ID','sh id') || '').toString().trim() === id.toString().trim()); }
+
+function getOutboundLeads(mainListing) {
+  return outboundLeads.filter(r => {
+    const mh = (gv(r, 'The Market Hub #', 'Market Hub') || '').toString().trim();
+    return mh === mainListing.toString().trim();
+  });
+}
+
+function aggregateCampaigns(leads) {
+  // Group by Campaign Objective + Campaign Run Date
+  const map = {};
+  leads.forEach(r => {
+    const type = (r['Campaign Objective'] || '').trim();
+    const date = r['Campaign Run Date'] || '';
+    const key = type + '||' + date;
+    if (!map[key]) map[key] = { type, date, sourced: 0, appt: 0, qual: 0, contractSent: 0, emd: 0 };
+    map[key].sourced += parseInt(r['Sourced'] || 0);
+    map[key].appt += parseInt(r['Appointment Set'] || 0);
+    map[key].qual += parseInt(r['Qualified'] || 0);
+    map[key].contractSent += parseInt(r['Contract Sent'] || 0);
+    map[key].emd += parseInt(r['UC w/ EMD'] || 0);
+  });
+  return Object.values(map).sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+// ── SCORING & FLAGS ───────────────────────────────────────────────────────
+function calcExposure(l, lc, ol) {
+  ol = ol || [];
+  const hasRealtor = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('realtor')) ||
+                     ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('realtor'));
+  const hasInvestor = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('investor')) ||
+                      ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('investor'));
+  const hasBuyer = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('buyer')) ||
+                   ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('buyer'));
+  const hasNeighbor = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('neighbor')) ||
+                      ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('neighbor'));
+
+  if (l.mls) {
+    let score = 35;
+    if (l.fb) score += 15;
+    if (hasRealtor) score += 15;
+    if (hasInvestor) score += 10;
+    if (hasBuyer) score += 10;
+    if (hasNeighbor) score += 10;
+    if (l.signBoards) score += 5;
+    return score;
+  } else {
+    let score = 0;
+    if (l.fb) score += 25;
+    if (hasRealtor) score += 25;
+    if (hasInvestor) score += 17;
+    if (hasBuyer) score += 17;
+    if (hasNeighbor) score += 11;
+    if (l.signBoards) score += 5;
+    return score;
+  }
+}
+
+function calcScore(l) {
+  if (l.stage === 'At Closing') return 85;
+  let s = 50;
+  if (l.saves !== null) { if (l.saves > 30) s += 25; else if (l.saves > 15) s += 15; else if (l.saves < 5 && l.dom > 21) s -= 20; else if (l.saves === 0 && l.dom > 14) s -= 25; }
+  if (l.dom !== null) { if (l.dom < 14) s += 10; else if (l.dom > 90) s -= 20; else if (l.dom > 45) s -= 10; }
+  if (l.qual > 0) s += 15; if (l.neg > 0) s += 10; if (l.emd > 0) s += 20;
+  if (l.profit !== null && l.profit < 0) s -= 30;
+  if (l.expiry !== null && l.expiry < 0) s -= 20;
+  if (l.expiry !== null && l.expiry < 15 && l.emd === 0) s -= 15;
+  if (l.title === 'Unprocessed') s -= 15;
+  if (l.daysDrop !== null && l.daysDrop > 30) s -= 10;
+  else if (l.daysDrop !== null && l.daysDrop > 7) s -= 5;
+  return Math.max(0, Math.min(100, Math.round(s)));
+}
+
+function calcHealth(l) {
+  if (l.profit < 0 || (l.expiry !== null && l.expiry < 0) || (l.expiry !== null && l.expiry < 15 && l.emd === 0) || l.title === 'Unprocessed') return 'urgent';
+  const s = calcScore(l);
+  if (s < 45) return 'urgent'; if (s < 65) return 'watch'; return 'good';
+}
+
+function calcFlags(l) {
+  const f = [];
+  if (l.profit !== null && l.profit < 0) f.push('Negative profit');
+  if (l.expiry !== null && l.expiry < 0) f.push('Contract expired');
+  if (l.expiry !== null && l.expiry >= 0 && l.expiry < 15 && l.emd === 0) f.push('Expiring <15d');
+  if (l.title === 'Unprocessed') f.push('Title unprocessed');
+  if (l.title && l.title.includes('Prem Title DD In Process')) f.push('Title in process');
+  if (l.daysDrop !== null && l.daysDrop > 7) f.push(l.daysDrop + 'd no price drop');
+  if (!l.mls && l.stage === 'Clear to Flip') f.push('Not on MLS');
+  if (l.type && l.type.includes('HOA') && l.dom !== null && l.dom > 30) f.push('HOA >30d DOM');
+  if (l.saves !== null && l.saves === 0 && l.dom !== null && l.dom > 14) f.push('Zero Zillow saves');
+  return f;
+}
+
+function calcRec(l) {
+  if (l.stage === 'At Closing') return 'At closing — transaction team owns this. Confirm wire and closing date with Pracy-Ann.';
+  if (l.profit !== null && l.profit < 0) return 'Negative profit — priced below cost basis. Raise price or escalate to Anshul.';
+  if (l.expiry !== null && l.expiry < 0) return 'Contract expired. Confirm extension or cancellation with transaction team immediately.';
+  if (l.title === 'Unprocessed') return 'Title not opened. Cannot close even with a buyer. Pracy-Ann opens escrow today.';
+  if (l.expiry !== null && l.expiry < 15 && l.emd === 0) return 'Expiring in ' + l.expiry + ' days with no EMD. Aggressive price drop + campaign blast now. Cash only.';
+  if (l.daysDrop !== null && l.daysDrop > 30) return l.daysDrop + ' days since last price update. Drop minimum $100–500 today — weekly drop rule violated.';
+  if (!l.mls && l.stage === 'Clear to Flip') return 'Clear to flip but not on MLS. No Zillow traction data. Get listed now — every day without MLS is a wasted day.';
+  if (l.saves !== null && l.saves === 0 && l.dom !== null && l.dom > 14) return 'Zero saves after ' + l.dom + ' DOM. Check MLS: confirm local area code phone + sales@maxacres.com in agent remarks.';
+  if (l.qual > 0 && l.neg > 0) return 'Active buyer negotiating. Hold price. Push for signed contract + non-refundable EMD this week.';
+  if (l.saves !== null && l.saves > 25 && l.dom !== null && l.dom < 21) return 'Strong early traction — ' + l.saves + ' saves at ' + l.dom + ' DOM. Hold price, work the qualified leads aggressively this week.';
+  return 'Maintain weekly price drops ($100 minimum) and run next campaign in sequence: Realtor → Investor Base → Buyer Base → Neighbor.';
+}
+
+// ── FORMATTING ────────────────────────────────────────────────────────────
+function fmt(n) { if (n === null || n === undefined || isNaN(n)) return '—'; return (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString(); }
+function fmtN(n) { return (n === null || n === undefined || isNaN(n)) ? '—' : Math.round(n).toString(); }
+function fmtDate(v) { if (!v) return '—'; if (v instanceof Date) return v.toLocaleDateString(); return v.toString().substring(0, 10); }
+function stageClass(s) { return s === 'TAH - Owned' ? 'b-p' : s === 'Due Diligence' ? 'b-a' : s === 'Clear to Flip' ? 'b-bl' : s === 'At Closing' ? 'b-g' : s === 'Clearing to Close' ? 'b-teal' : 'b-gr'; }
+function scoreClass(s) { return s < 45 ? 'sr-r' : s < 65 ? 'sr-a' : 'sr-g'; }
+function campTypeClass(t) { const tl = (t||'').toLowerCase(); return tl.includes('realtor') ? 'b-bl' : tl.includes('investor') ? 'b-teal' : tl.includes('buyer') ? 'b-p' : tl.includes('neighbor') ? 'b-a' : 'b-gr'; }
+function buyerStatusClass(s) { const sl = (s||'').toLowerCase(); return sl.includes('hot') ? 'hot' : sl.includes('warm') ? 'warm' : sl.includes('cold') ? 'cold' : sl.includes('back') ? 'backed' : sl.includes('contract') ? 'uc' : ''; }
+function chipHtml(yes, label) { return `<span class="badge ${yes ? 'b-g' : 'b-gr'}">${yes ? '+ ' : '— '}${label}</span>`; }
+
+// ── PORTFOLIO RENDER ──────────────────────────────────────────────────────
+function renderPortfolio() {
+  const visible = listings.filter(l => {
+    if (podFilter !== 'all' && l.pod !== podFilter) return false;
+    if (stageFilter.length > 0 && !stageFilter.includes(l.stage)) return false;
+    if (stateFilter.length > 0 && !stateFilter.includes(l.state)) return false;
+    if (titleFilter.length > 0 && !titleFilter.includes(l.title)) return false;
+    if (expiryFilter !== 'all') {
+      const e = l.expiry;
+      if (expiryFilter === 'critical' && !(e !== null && e < 15)) return false;
+      if (expiryFilter === 'urgent' && !(e !== null && e >= 15 && e < 30)) return false;
+      if (expiryFilter === 'watch' && !(e !== null && e >= 30 && e < 60)) return false;
+      if (expiryFilter === 'good' && !(e !== null && e >= 60)) return false;
+    }
+    if (priceStaleFilter && !(l.daysDrop !== null && l.daysDrop > 14)) return false;
+    if (noMlsFilter && l.mls) return false;
+    if (dropsFilter !== 'all') {
+      const d = l.drops;
+      if (dropsFilter === '0' && d !== 0) return false;
+      if (dropsFilter === '1' && d !== 1) return false;
+      if (dropsFilter === '2' && d !== 2) return false;
+      if (dropsFilter === '3' && d !== 3) return false;
+      if (dropsFilter === '4' && d !== 4) return false;
+      if (dropsFilter === '5+' && d < 5) return false;
+    }
+    if (dropAgeFilter !== 'all') {
+      const d = l.daysDrop;
+      if (d === null) return false;
+      if (dropAgeFilter === 'lt7'   && !(d < 7)) return false;
+      if (dropAgeFilter === '7to15' && !(d >= 7 && d < 15)) return false;
+      if (dropAgeFilter === '15to30'&& !(d >= 15 && d <= 30)) return false;
+      if (dropAgeFilter === '30to60'&& !(d > 30 && d <= 60)) return false;
+      if (dropAgeFilter === 'gt60'  && !(d > 60)) return false;
+    }
+    if (peiFilter !== 'all') {
+      const pei = calcExposure(l, getCamps(l.id), l.mainListing ? getOutboundLeads(l.mainListing) : []);
+      if (peiFilter === 'optimal'  && pei < 90) return false;
+      if (peiFilter === 'strong'   && !(pei >= 70 && pei < 90)) return false;
+      if (peiFilter === 'moderate' && !(pei >= 50 && pei < 70)) return false;
+      if (peiFilter === 'subpar'   && !(pei >= 30 && pei < 50)) return false;
+      if (peiFilter === 'poor'     && pei >= 30) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    const ea = a.expiry === null ? 9999 : a.expiry < 0 ? 0 : a.expiry;
+    const eb = b.expiry === null ? 9999 : b.expiry < 0 ? 0 : b.expiry;
+    return ea - eb;
+  });
+
+  const totalListings = visible.length;
+  const totalPotentialProfit = visible.reduce((s, l) => s + (getPdFields(l).profit || 0), 0);
+  const priceStaleCount = visible.filter(l => l.daysDrop !== null && l.daysDrop > 14).length;
+  const noMlsCount = visible.filter(l => !l.mls).length;
+  const noMlsProfit = visible.filter(l => !l.mls).reduce((s, l) => s + (getPdFields(l).profit || 0), 0);
+
+  document.getElementById('summaryBar').innerHTML = `
+    <div class="sm" style="cursor:default"><div class="sm-v">${totalListings}</div><div class="sm-l">Total listings</div></div>
+    <div class="sm" style="cursor:default"><div class="sm-v ${totalPotentialProfit < 0 ? 'red' : 'green'}">${fmt(totalPotentialProfit)}</div><div class="sm-l">Potential profit</div></div>
+    <div class="sm sm-filter ${priceStaleFilter ? 'sm-active' : ''}" onclick="togglePriceStale()" title="Click to filter"><div class="sm-v amber">${priceStaleCount}</div><div class="sm-l">Last price change >14d ${priceStaleFilter ? '✓' : ''}</div></div>
+    <div class="sm sm-filter ${noMlsFilter ? 'sm-active' : ''}" onclick="toggleNoMls()" title="Click to filter">
+      <div class="sm-v ${noMlsCount > 0 ? 'amber' : 'green'}">${noMlsCount}</div>
+      <div class="sm-l">Not on MLS ${noMlsFilter ? '✓' : ''}</div>
+    </div>
+    <div class="sm sm-filter ${noMlsFilter ? 'sm-active' : ''}" onclick="toggleNoMls()" title="Click to filter">
+      <div class="sm-v ${noMlsProfit < 0 ? 'red' : 'amber'}">${fmt(noMlsProfit)}</div>
+      <div class="sm-l">Profit at stake</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:3px">${totalPotentialProfit !== 0 ? Math.round(noMlsProfit / totalPotentialProfit * 100) : 0}% of portfolio</div>
+    </div>`;
+
+  const tbody = document.getElementById('portfolioBody');
+  tbody.innerHTML = '';
+
+  visible.forEach(l => {
+    const h = calcHealth(l), s = calcScore(l), f = calcFlags(l);
+    const lc = getCamps(l.id);
+    const pei = calcExposure(l, lc, l.mainListing ? getOutboundLeads(l.mainListing) : []);
+    const peiColor = pei >= 90 ? 'sr-g' : pei >= 50 ? 'sr-a' : 'sr-r';
+    const sp = l.listP !== null ? l.listP - l.contractP : null;
+    const spHtml = sp === null ? '—' : sp < 0 ? `<span class="red">${fmt(sp)}</span>` : sp < 10000 ? `<span class="amber">${fmt(sp)}</span>` : fmt(sp);
+    const zViewsHtml = l.zViews === null ? '<span class="muted">—</span>' : `${l.zViews.toLocaleString()}`;
+    const zSavesHtml = l.saves === null ? '<span class="muted">—</span>' : l.saves === 0 ? '<span class="red">0</span>' : l.saves < 10 ? `<span class="amber">${l.saves}</span>` : `<span class="green">${l.saves}</span>`;
+    const domHtml = l.dom === null ? '<span class="muted">—</span>' : l.dom > 90 ? `<span class="red">${l.dom}</span>` : l.dom > 45 ? `<span class="amber">${l.dom}</span>` : l.dom;
+    const expHtml = l.expiry === null ? '—' : l.expiry < 0 ? '<span class="red">Expired</span>' : l.expiry > 3650 ? '<span class="muted">None</span>' : l.expiry < 15 ? `<span class="red">${l.expiry}d</span>` : l.expiry < 30 ? `<span class="amber">${l.expiry}d</span>` : l.expiry + 'd';
+    const daysSinceDrop = l.daysDrop !== null ? l.daysDrop : null;
+    const ldHtml = daysSinceDrop === null ? '<span class="muted">—</span>' : daysSinceDrop > 30 ? `<span class="red">${daysSinceDrop}d</span>` : daysSinceDrop > 7 ? `<span class="amber">${daysSinceDrop}d</span>` : daysSinceDrop + 'd';
+
+    const tr = document.createElement('tr');
+    tr.className = 'dr' + (activeCardId === l.id ? ' active' : '');
+    tr.onclick = () => showCard(l.id);
+    tr.innerHTML = `
+      <td><div class="prop-name" style="font-size:11px;white-space:nowrap">${l.addr}</div><div class="prop-sub">${l.state} · ${l.county}</div></td>
+      <td><span style="font-size:11px;font-weight:600;color:var(--blue-text)">${l.mainListing || l.id}</span></td>
+      <td>${l.landId ? `<a href="${l.landId}" target="_blank" style="font-size:11px;color:var(--blue-text);text-decoration:none;font-weight:500">LandID ↗</a>` : '<span class="muted">—</span>'}${l.zillowLink ? `<br><a href="${l.zillowLink}" target="_blank" style="font-size:10px;color:var(--teal-text);text-decoration:none;font-weight:500">Zillow ↗</a>` : ''}</td>
+      <td><span class="score-ring ${peiColor}">${pei}%</span></td>
+      <td>${fmt(l.contractP)}</td>
+      <td>${fmt(l.listP)}</td>
+      <td>${ldHtml}</td>
+      <td>${spHtml}</td>
+      <td>${domHtml}</td>
+      <td>${expHtml}</td>
+      <td>${zViewsHtml}</td>
+      <td>${zSavesHtml}</td>
+      <td>
+        <div style="display:flex;gap:5px;align-items:center">
+          ${[['ML', l.mls], ['FB', l.fb]].map(([init, active]) =>
+            `<div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:${active ? 'var(--green-bg)' : 'var(--bg2)'};color:${active ? 'var(--green-text)' : 'var(--text3)'};border:1.5px solid ${active ? 'var(--green-border)' : 'var(--border)'}">${init}</div>`
+          ).join('')}
+        </div>
+      </td>
+      <td>
+        <div style="display:flex;gap:5px;align-items:center">
+          ${[['BB','buyer'], ['RT','realtor'], ['IV','investor'], ['NG','neighbor']].map(([init, type]) => {
+            const ol2 = l.mainListing ? getOutboundLeads(l.mainListing) : [];
+            const ran = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes(type)) ||
+                        ol2.some(r => (r['Campaign Objective'] || '').toLowerCase().includes(type));
+            return `<div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:${ran ? 'var(--blue-bg)' : 'var(--bg2)'};color:${ran ? 'var(--blue-text)' : 'var(--text3)'};border:1.5px solid ${ran ? 'var(--blue-border)' : 'var(--border)'}">${init}</div>`;
+          }).join('')}
+        </div>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── CARD RENDER ───────────────────────────────────────────────────────────
+function showCard(id) {
+  activeCardId = id;
+  const l = listings.find(x => x.id === id); if (!l) return;
+  const h = calcHealth(l), s = calcScore(l), f = calcFlags(l);
+  const lc = getCamps(id), lf = getFbacks(id);
+  const ol = l.mainListing ? getOutboundLeads(l.mainListing) : [];
+  const pdRow = l.mainListing ? getPriceDrop(l.mainListing) : null;
+  const pdHistory = parsePriceDropHistory(pdRow);
+  const pdStatus = pdRow ? (pdRow['Price Drop Status'] || '') : '';
+  const pdStatusColor = pdStatus.includes('Final') ? 'b-r' : pdStatus.includes('Original') ? 'b-g' : 'b-a';
+
+  // Price fields — use price drop report when available, fall back to Salesforce
+  const pdf = getPdFields(l);
+  const origPrice = pdf.origPrice;
+  const listPrice = pdf.listP;
+  const lastListPrice = pdf.lastListP;
+  const dropCount = pdf.drops;
+  const lastDropDate = pdf.lastDropDate;
+  const pricePctCalc = pdf.pricePct ? (pdf.pricePct * 100).toFixed(1) : null;
+  const aggCamps = ol.length > 0 ? aggregateCampaigns(ol) : [];
+
+  destroyCharts();
+  renderPortfolio();
+
+  const savesData = genSavesHistory(l);
+  const priceData = genPriceHistory(l);
+
+  // Use outbound leads report if available, otherwise fall back to activity log
+  const campRows = aggCamps.length > 0 ? (() => {
+    // Sort by campaign objective then by date desc
+    const sorted = [...aggCamps].sort((a, b) => {
+      if (a.type < b.type) return -1;
+      if (a.type > b.type) return 1;
+      return new Date(b.date) - new Date(a.date);
+    });
+
+    // Campaign summary rows
+    const summaryRows = sorted.map(c => `<tr>
+      <td><span class="badge ${campTypeClass(c.type)}">${c.type}</span></td>
+      <td>${fmtDate(c.date)}</td>
+      <td style="text-align:center;font-weight:600">${c.sourced || 0}</td>
+      <td style="text-align:center;font-weight:600">${c.appt || 0}</td>
+      <td style="text-align:center;font-weight:600">${c.qual || 0}</td>
+      <td style="text-align:center;font-weight:600">${c.contractSent || 0}</td>
+      <td style="text-align:center;font-weight:600;color:var(--green-text)">${c.emd || 0}</td>
+    </tr>`).join('');
+
+    // Totals row
+    const totals = aggCamps.reduce((t, c) => ({ sourced: t.sourced + c.sourced, appt: t.appt + c.appt, qual: t.qual + c.qual, contractSent: t.contractSent + c.contractSent, emd: t.emd + c.emd }), { sourced: 0, appt: 0, qual: 0, contractSent: 0, emd: 0 });
+    const totalsRow = `<tr style="border-top:2px solid var(--border);background:var(--bg3)">
+      <td style="font-weight:700;font-size:11px">TOTAL</td><td></td>
+      <td style="text-align:center;font-weight:700">${totals.sourced}</td>
+      <td style="text-align:center;font-weight:700">${totals.appt}</td>
+      <td style="text-align:center;font-weight:700">${totals.qual}</td>
+      <td style="text-align:center;font-weight:700">${totals.contractSent}</td>
+      <td style="text-align:center;font-weight:700;color:var(--green-text)">${totals.emd}</td>
+    </tr>`;
+
+    return summaryRows + totalsRow;
+  })() : lc.length > 0 ? lc.map(c => {
+    const type = c['Campaign type'] || c['Campaign Type'] || '';
+    const date = c['Date run'] || c['Date Run'] || c['Date'] || '';
+    const leads = c['Leads sourced'] || c['Leads Sourced'] || '—';
+    const appts = c['Appointments set'] || c['Appointments Set'] || '—';
+    const qual = c['Qualified leads'] || c['Qualified Leads'] || '—';
+    return `<tr>
+      <td><span class="badge ${campTypeClass(type)}">${type}</span></td>
+      <td>${fmtDate(date)}</td>
+      <td style="text-align:center;font-weight:600">${leads}</td>
+      <td style="text-align:center;font-weight:600">${appts}</td>
+      <td style="text-align:center;font-weight:600">${qual}</td>
+      <td colspan="2">—</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="7"><div class="no-data">No campaigns logged — upload the outbound campaigns report</div></td></tr>`;
+
+  const fbRows = lf.length > 0 ? [...lf].sort((a, b) => new Date(b['Date'] || 0) - new Date(a['Date'] || 0)).map(fb => {
+    const buyer = fb['Buyer name / ref'] || fb['Buyer name'] || '—';
+    const bt = fb['Buyer type'] || fb['Buyer Type'] || '—';
+    const it = fb['Interaction type'] || fb['Interaction Type'] || '—';
+    const offer = fb['Offer amount'] || fb['Offer Amount'] || null;
+    const status = fb['Buyer status'] || fb['Buyer Status'] || '—';
+    const next = fb['Next step'] || fb['Next Step'] || '—';
+    const notes = fb['Notes'] || '';
+    return `<tr>
+      <td>${fmtDate(fb['Date'])}</td>
+      <td style="font-weight:500">${buyer}</td>
+      <td><span class="badge b-gr">${bt}</span></td>
+      <td>${it}</td>
+      <td>${offer ? fmt(parseFloat(offer)) : '—'}</td>
+      <td class="${buyerStatusClass(status)}">${status}</td>
+      <td>${next}</td>
+      <td style="color:var(--text3)">${notes}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="8"><div class="no-data">No buyer interactions logged — closers to fill in the weekly activity log</div></td></tr>`;
+
+  const flagsHtml = f.length > 0 ? f.map(x => `<span class="badge b-r">${x}</span>`).join(' ') : '<span class="badge b-g">No flags</span>';
+
+  document.getElementById('cardArea').innerHTML = `
+  <div class="card-wrap">
+
+    <div class="card-head">
+      <!-- Row 1: Owner + Listing ID + Links -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;gap:32px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Owner</div>
+            <div style="font-size:20px;font-weight:700;color:var(--text);line-height:1">${l.sellerName || '—'}</div>
+          </div>
+          <div style="width:1px;height:36px;background:var(--border)"></div>
+          <div>
+            <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Listing ID</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="font-size:18px;font-weight:700;color:var(--blue-text);line-height:1">${l.mainListing || l.id}</div>
+              <a href="#" style="font-size:10px;color:var(--text3);text-decoration:none;padding:2px 8px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg2)" title="Open in Salesforce">SF ↗</a>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+          ${l.zillowLink ? `<a href="${l.zillowLink}" target="_blank" style="font-size:11px;font-weight:600;color:var(--teal-text);text-decoration:none;padding:6px 14px;border-radius:var(--r-md);border:1px solid var(--teal-text);background:var(--teal-bg);white-space:nowrap">Zillow ↗</a>` : ''}
+          ${l.landId ? `<a href="${l.landId}" target="_blank" style="font-size:11px;font-weight:600;color:var(--blue-text);text-decoration:none;padding:6px 14px;border-radius:var(--r-md);border:1px solid var(--blue-border);background:var(--blue-bg);white-space:nowrap">LandID ↗</a>` : ''}
+        </div>
+      </div>
+      <!-- Row 2: Property ID / Size / Address / State / County -->
+      <div style="display:flex;gap:40px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property ID</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:13px;font-weight:500;color:var(--text)">${l.sfPropertyId || '—'}</div>
+            ${l.sfPropertyId ? `<a href="https://goldsoil.lightning.force.com/lightning/r/Property__c/${l.sfPropertyId}/view" target="_blank" style="font-size:10px;color:var(--text3);text-decoration:none;padding:2px 8px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg2)">SF ↗</a>` : `<span style="font-size:10px;color:var(--text3);padding:2px 8px;border-radius:4px;border:0.5px solid var(--border);background:var(--bg2);opacity:0.4">SF ↗</span>`}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Size</div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${l.size || '—'}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property Address</div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${l.addr}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">State</div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${l.state}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">County</div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${l.county}</div>
+        </div>
+      </div>
+      <!-- Row 3: Property Type / CPI / LDS -->
+      <div style="display:flex;gap:40px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property Type</div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${l.type || '—'}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">CPI</div>
+          <div style="font-size:13px;font-weight:600;color:${l.cpi && l.cpi !== 'Not Available' ? 'var(--amber-text)' : 'var(--text3)'}">${l.cpi && l.cpi !== 'Not Available' ? l.cpi : '—'}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">LDS</div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${l.lds !== null ? l.lds : '—'}</div>
+        </div>
+      </div>
+      <!-- Row 4: Transaction # / Title Status / Stage / POD -->
+      <div style="display:flex;gap:40px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Transaction #</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="font-size:13px;font-weight:500;color:var(--text)">${l.txn || '—'}</div>
+            ${l.txn ? `<a href="#" style="font-size:10px;color:var(--text3);text-decoration:none;padding:2px 8px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg2)">SF ↗</a>` : `<span style="font-size:10px;color:var(--text3);padding:2px 8px;border-radius:4px;border:0.5px solid var(--border);background:var(--bg2);opacity:0.4">SF ↗</span>`}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Title Status</div>
+          <div><span class="badge ${l.title === 'Unprocessed' ? 'b-r' : l.title && l.title.includes('Complex') ? 'b-a' : 'b-g'}">${l.title || '—'}</span></div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Stage</div>
+          <div><span class="badge ${stageClass(l.stage)}">${l.stage || '—'}</span></div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">POD</div>
+          <div style="font-size:13px;font-weight:500;color:var(--text)">${l.pod || '—'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-body">
+
+      <!-- TIMELINE -->
+      <div class="sec">
+        ${(() => {
+          const today = new Date();
+          const contractDate = l.contractDate ? new Date(l.contractDate) : null;
+          const listDate = l.dom !== null ? new Date(today.getTime() - l.dom * 86400000) : null;
+          const expiryDate = l.expiry !== null && l.expiry >= 0 && l.expiry < 3650 ? new Date(today.getTime() + l.expiry * 86400000) : null;
+
+          if (!contractDate) return '<div class="no-data">Timeline unavailable — missing contract date</div>';
+
+          // If no expiry, use contract date + 2 years as display window
+          const effectiveExpiry = expiryDate || new Date(contractDate.getTime() + 730 * 86400000);
+          const noExpiry = !expiryDate;
+
+          const start = contractDate.getTime();
+          const end = effectiveExpiry.getTime();
+          const total = end - start;
+          const pct = t => Math.max(0, Math.min(100, ((t - start) / total) * 100));
+          const fmtShort = d => d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '—';
+          const daysLeft = l.expiry !== null && l.expiry < 3650 ? l.expiry : null;
+          const barColor = daysLeft === null ? 'var(--blue-border)' : daysLeft < 0 ? 'var(--red-border)' : daysLeft < 15 ? 'var(--red-border)' : daysLeft < 30 ? 'var(--amber-border)' : 'var(--blue-border)';
+
+          const todayPct = pct(today.getTime());
+          const listPct = listDate ? pct(listDate.getTime()) : null;
+
+          // Real price drop dots from price drop report
+          const realDrops = pdHistory
+            .filter(d => d.date && d.label !== 'Original')
+            .map(d => ({ date: new Date(d.date), price: d.price, label: d.label }))
+            .filter(d => !isNaN(d.date.getTime()) && d.date >= contractDate && d.date <= expiryDate)
+            .sort((a, b) => a.date - b.date);
+
+          // Build milestones — fixed alternating above/below
+          const milestones = [
+            { pct: 0, color: 'var(--green-border)', label: 'Contracted', date: fmtShort(contractDate), above: false },
+            ...(listPct !== null ? [{ pct: listPct, color: 'var(--blue-border)', label: 'Listed', date: fmtShort(listDate), above: true }] : []),
+            ...realDrops.map((d, i) => ({
+              pct: pct(d.date.getTime()),
+              color: 'var(--amber-border)',
+              label: fmt(d.price),
+              date: fmtShort(d.date),
+              above: (i + (listPct !== null ? 1 : 0)) % 2 === 0,
+              isPriceDrop: true
+            })),
+            { pct: todayPct, color: barColor, label: 'Today', date: fmtShort(today), above: true, isToday: true },
+            ...(noExpiry ? [] : [{ pct: 100, color: daysLeft !== null && daysLeft < 15 ? 'var(--red-border)' : 'var(--text3)', label: 'Expires', date: fmtShort(effectiveExpiry) + ' · ' + (daysLeft < 0 ? 'Expired' : daysLeft + 'd left'), above: false, isEnd: true }]),
+          ];
+
+          const ABOVE_TOP = 6;
+          const BELOW_TOP = 22;
+
+          const dotHtml = m => `
+            <div style="position:absolute;left:${m.pct}%;top:50%;transform:translate(-50%,-50%);z-index:2">
+              ${m.isToday
+                ? `<div style="width:14px;height:14px;border-radius:50%;background:var(--bg);border:3px solid ${m.color};box-shadow:0 0 0 3px ${m.color}22"></div>`
+                : m.isPriceDrop
+                  ? `<div style="width:10px;height:10px;border-radius:50%;background:var(--amber-border);border:2px solid var(--bg)"></div>`
+                  : `<div style="width:12px;height:12px;border-radius:50%;background:${m.color};border:2px solid var(--bg)"></div>`}
+              <div style="position:absolute;${m.above ? 'bottom:' + ABOVE_TOP + 'px' : 'top:' + BELOW_TOP + 'px'};${m.isEnd ? 'right:0;text-align:right' : 'left:50%;transform:translateX(-50%);text-align:center'};white-space:nowrap;line-height:1.5">
+                <div style="font-size:9px;font-weight:${m.isToday ? '700' : '600'};color:${m.isToday ? m.color : m.isPriceDrop ? 'var(--amber-text)' : 'var(--text3)'};text-transform:uppercase;letter-spacing:0.04em">${m.label}</div>
+                <div style="font-size:10px;color:${m.label === 'Expires' && daysLeft < 15 ? 'var(--red-text)' : 'var(--text2)'}">${m.date}</div>
+              </div>
+            </div>`;
+
+          return `
+            <div style="position:relative;height:100px;margin:0 8px">
+              <div style="position:absolute;top:50%;left:0;right:0;height:4px;background:var(--bg3);border-radius:2px;transform:translateY(-50%)">
+                <div style="position:absolute;left:0;top:0;height:100%;width:${todayPct}%;background:${barColor};border-radius:2px"></div>
+                ${milestones.map(dotHtml).join('')}
+              </div>
+            </div>
+            ${realDrops.length > 0 ? '' : pdOk ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;text-align:center">No price drop dates in report for this listing</div>' : ''}`;
+        })()}
+      </div>
+
+      <!-- RED FLAGS -->
+      ${(() => {
+        const flags = [];
+
+        // Not on MLS
+        if (!l.mls) {
+          flags.push({
+            level: 'critical',
+            title: 'Not listed on MLS',
+            body: 'Property has no Zillow or MLS exposure. No saves or DOM data will accrue until listed.',
+            action: 'List on MLS'
+          });
+        }
+
+        // 45 days or less — best price window
+        if (l.expiry !== null && l.expiry <= 45 && l.expiry > 15) {
+          flags.push({
+            level: 'warning',
+            title: `${l.expiry} days to contract expiry`,
+            body: 'Under 45 days remaining on the seller contract. Pricing decisions made now will directly impact the outcome.',
+            action: `${l.expiry}d left`
+          });
+        }
+
+        // 15 days or less — decision required
+        if (l.expiry !== null && l.expiry <= 15 && l.expiry >= 0) {
+          flags.push({
+            level: 'critical',
+            title: `${l.expiry} days to expiry — decision required`,
+            body: 'Contract expires in ' + l.expiry + ' days. Options: Cancel, Extend with seller, or Buy at contract price.',
+            action: 'Cancel · Extend · Buy'
+          });
+        }
+
+        // Expired
+        if (l.expiry !== null && l.expiry < 0) {
+          flags.push({
+            level: 'critical',
+            title: 'Contract expired',
+            body: 'Seller contract expiry date has passed. Confirm current status with transaction team.',
+            action: 'Confirm with Pracy-Ann'
+          });
+        }
+
+        // Negative profit
+        if (l.profit !== null && l.profit < 0) {
+          flags.push({
+            level: 'critical',
+            title: 'Negative profit',
+            body: `List price of ${fmt(l.listP)} is currently below cost basis — selling at this price would result in a loss of ${fmt(Math.abs(l.profit))}.`,
+            action: 'Escalate to Anshul'
+          });
+        }
+
+        // Title unprocessed
+        if (l.title === 'Unprocessed') {
+          flags.push({
+            level: 'critical',
+            title: 'Title not opened',
+            body: 'Escrow has not been opened on this listing. A buyer cannot close until title is processed.',
+            action: 'Open escrow — Pracy-Ann'
+          });
+        }
+
+        // Price drop overdue
+        if (l.daysDrop !== null && l.daysDrop > 15) {
+          flags.push({
+            level: 'warning',
+            title: `${l.daysDrop} days since last price drop`,
+            body: 'Per SOP, a price drop is required every 15 days on every listing to maintain Zillow algorithm visibility.',
+            action: 'Drop price'
+          });
+        }
+
+        // Zillow SOP — Saves vs DOM ratio logic
+        if (l.dom !== null && l.saves !== null && l.dom >= 10) {
+          const dom = l.dom;
+          const saves = l.saves;
+          const sourced = l.sourced || 0;
+          const ratio = saves / dom;
+          const gap = dom - saves;
+
+          // High saves, no inquiries
+          if (saves > dom && sourced === 0) {
+            flags.push({
+              level: 'critical',
+              title: `${saves} saves but zero inquiries`,
+              body: 'Saves exceed DOM but no leads have been sourced. Check that MaxAcres contact info (local phone + sales@maxacres.com) is present in the MLS agent remarks — this is sometimes missed by listing agents.',
+              action: 'Check MLS agent remarks'
+            });
+          }
+          // Saves > DOM — good, no flag
+          else if (saves > dom) { }
+          // Saves ≈ DOM — on track, no flag
+          else if (ratio >= 0.8) { }
+          // Saves << DOM — listing fatigue
+          else if (dom >= 30 && gap > dom * 0.6) {
+            flags.push({
+              level: 'critical',
+              title: `${saves} saves vs ${dom} DOM — large gap`,
+              body: 'Saves are significantly behind days on market. Per SOP, this indicates listing fatigue — common for remote land after 30 days.',
+              action: 'Review with management'
+            });
+          }
+          // Saves < DOM — pricing signal
+          else if (ratio < 0.8) {
+            flags.push({
+              level: dom >= 30 ? 'critical' : 'warning',
+              title: `Saves behind DOM — ${saves} saves vs ${dom} days`,
+              body: dom >= 30
+                ? 'Saves have not kept pace with DOM beyond 30 days. Per SOP, this is the point to reassess pricing and listing quality.'
+                : 'Saves are behind DOM in the 10–30 day window. Per SOP, this is the primary pricing signal period.',
+              action: dom >= 30 ? 'Reassess with management' : 'Review price'
+            });
+          }
+        }
+
+        // HOA property — check mobile homes
+        if (l.type && l.type.toLowerCase().includes('hoa')) {
+          const mobileOk = l.type.toLowerCase().includes('mobile home ok');
+          if (!mobileOk && l.dom !== null && l.dom > 14) {
+            flags.push({
+              level: 'warning',
+              title: 'HOA property — mobile homes not permitted',
+              body: 'HOA lots are hard to sell without mobile home allowance. The primary buyer pool for HOA land is mobile home buyers. Verify with the HOA whether mobile homes are permitted — this is the single biggest selling point for these lots.',
+              action: 'Verify mobile home allowance with HOA'
+            });
+          }
+        }
+
+        // DOM 0–9: too early, no Zillow flags
+
+        if (flags.length === 0) return `
+          <div class="sec">
+            <div class="sec-title">Red flags</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--green-bg);border-radius:var(--r-md);border:1px solid var(--green-border)">
+              <span style="font-size:16px">✓</span>
+              <span style="font-size:12px;color:var(--green-text);font-weight:500">No active red flags — listing is in good standing</span>
+            </div>
+          </div>`;
+
+        return `
+          <div class="sec">
+            <div class="sec-title">Red flags — ${flags.length} issue${flags.length !== 1 ? 's' : ''} requiring attention</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              ${flags.map(flag => `
+                <div style="border-radius:var(--r-md);border-left:3px solid ${flag.level === 'critical' ? 'var(--red-border)' : 'var(--amber-border)'};background:${flag.level === 'critical' ? 'var(--red-bg)' : 'var(--amber-bg)'};padding:12px 16px">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+                    <div style="flex:1">
+                      <div style="font-size:12px;font-weight:700;color:${flag.level === 'critical' ? 'var(--red-text)' : 'var(--amber-text)'};margin-bottom:4px">${flag.level === 'critical' ? '🚨' : '⚠️'} ${flag.title}</div>
+                      <div style="font-size:11px;color:var(--text);line-height:1.6">${flag.body}</div>
+                    </div>
+                    <div style="flex-shrink:0;font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;background:${flag.level === 'critical' ? 'var(--red-text)' : 'var(--amber-text)'};color:#fff;white-space:nowrap">${flag.action}</div>
+                  </div>
+                </div>`).join('')}
+            </div>
+          </div>`;
+      })()}
+
+      <!-- DEAL ECONOMICS -->
+      <div class="sec">
+        <div class="sec-title">Deal economics</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">
+          <div class="mc">
+            <div class="mc-l">Contract price</div>
+            <div class="mc-v">${fmt(pdf.contractP)}</div>
+            <div class="mc-s">${l.daysUnder !== null ? l.daysUnder + 'd held' : '—'}</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Original list price</div>
+            <div class="mc-v">${origPrice ? fmt(origPrice) : '—'}</div>
+            <div class="mc-s">At listing</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Current list price</div>
+            <div class="mc-v">${fmt(listPrice)}</div>
+            <div class="mc-s">${dropCount} drop${dropCount !== 1 ? 's' : ''}</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Last list price</div>
+            <div class="mc-v">${fmt(lastListPrice)}</div>
+            <div class="mc-s">Before last drop</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Last drop date</div>
+            <div class="mc-v" style="font-size:13px">${lastDropDate ? fmtDate(lastDropDate) : '—'}</div>
+            <div class="mc-s">${lastDropDate ? Math.round((new Date() - new Date(lastDropDate)) / 86400000) + 'd ago' : '—'}</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Net price drop</div>
+            <div class="mc-v ${pricePctCalc && parseFloat(pricePctCalc) > 0 ? 'amber' : ''}">${pricePctCalc ? pricePctCalc + '%' : '—'}</div>
+            <div class="mc-s">${origPrice && listPrice ? fmt(origPrice - listPrice) + ' off' : 'From original'}</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Days to expiry</div>
+            <div class="mc-v ${l.expiry !== null && l.expiry < 0 ? 'red' : l.expiry !== null && l.expiry < 15 ? 'red' : l.expiry !== null && l.expiry < 30 ? 'amber' : ''}">${l.expiry !== null ? (l.expiry < 0 ? 'Expired' : l.expiry > 3650 ? 'None' : l.expiry + 'd') : '—'}</div>
+            <div class="mc-s">${l.contractDate ? 'Signed: ' + fmtDate(l.contractDate) : '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ZILLOW -->
+      <div class="sec">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="sec-title" style="margin-bottom:0">Zillow${l.zillowCaptured ? `<span style="font-weight:400;color:var(--text3);font-size:10px;margin-left:8px;text-transform:none;letter-spacing:0">captured ${fmtDate(l.zillowCaptured)}</span>` : ''}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+          <div class="mc">
+            <div class="mc-l">MLS</div>
+            <div class="mc-v ${l.mls ? 'green' : 'red'}">${l.mls ? 'Yes' : 'No'}</div>
+            <div class="mc-s">${l.listingStatus || '—'}</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">MLS DOM</div>
+            <div class="mc-v ${l.dom !== null && l.dom > 90 ? 'red' : l.dom !== null && l.dom > 45 ? 'amber' : ''}">${fmtN(l.dom)}<span style="font-size:12px;font-weight:400">d</span></div>
+            <div class="mc-s">Days on market</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Zillow saves</div>
+            <div class="mc-v ${l.saves === 0 ? 'red' : l.saves !== null && l.saves < 10 ? 'amber' : 'green'}">${fmtN(l.saves)}</div>
+            <div class="mc-s">30-day rolling</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Zillow views</div>
+            <div class="mc-v ${l.zViews !== null ? '' : 'muted'}">${l.zViews !== null ? l.zViews.toLocaleString() : '—'}</div>
+            <div class="mc-s">${l.zViews !== null ? 'Total views' : 'Not in report yet'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXPOSURE INDEX -->
+      <div class="sec">
+        <div class="sec-title">LEI — Land Exposure Index</div>
+        ${(() => {
+          const exp = calcExposure(l, lc, ol);
+          const expColor = exp >= 90 ? 'var(--green-border)' : exp >= 50 ? 'var(--amber-border)' : 'var(--red-border)';
+          const expBg = exp >= 90 ? 'var(--green-bg)' : exp >= 50 ? 'var(--amber-bg)' : 'var(--red-bg)';
+          const expText = exp >= 90 ? 'var(--green-text)' : exp >= 50 ? 'var(--amber-text)' : 'var(--red-text)';
+          const expLabel = exp >= 90 ? 'Optimal' : exp >= 70 ? 'Strong' : exp >= 50 ? 'Moderate' : exp >= 30 ? 'Sub-Par' : 'Poor';
+          const hasR = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('realtor')) || ol.some(r => (r['Campaign Objective']||'').toLowerCase().includes('realtor'));
+          const hasI = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('investor')) || ol.some(r => (r['Campaign Objective']||'').toLowerCase().includes('investor'));
+          const hasB = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('buyer')) || ol.some(r => (r['Campaign Objective']||'').toLowerCase().includes('buyer'));
+          const hasN = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('neighbor')) || ol.some(r => (r['Campaign Objective']||'').toLowerCase().includes('neighbor'));
+          const channels = l.mls ? [
+            { label: 'MLS', weight: 35, active: l.mls },
+            { label: 'Facebook Marketplace', weight: 15, active: l.fb },
+            { label: 'Realtor campaign', weight: 15, active: hasR },
+            { label: 'Investor Base campaign', weight: 10, active: hasI },
+            { label: 'Buyer Base campaign', weight: 10, active: hasB },
+            { label: 'Neighbor campaign', weight: 10, active: hasN },
+            { label: 'Sign boards', weight: 5, active: l.signBoards },
+          ] : [
+            { label: 'MLS', weight: 0, active: false, note: 'Not listed' },
+            { label: 'Facebook Marketplace', weight: 25, active: l.fb },
+            { label: 'Realtor campaign', weight: 25, active: hasR },
+            { label: 'Investor Base campaign', weight: 17, active: hasI },
+            { label: 'Buyer Base campaign', weight: 17, active: hasB },
+            { label: 'Neighbor campaign', weight: 11, active: hasN },
+            { label: 'Sign boards', weight: 5, active: l.signBoards },
+          ];
+          return `
+            <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
+                <div style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${expBg};border:3px solid ${expColor}">
+                  <span style="font-size:20px;font-weight:700;color:${expText}">${exp}%</span>
+                </div>
+                <div>
+                  <div style="font-size:14px;font-weight:600;color:${expText}">${expLabel}</div>
+                  <div style="font-size:11px;color:var(--text3);margin-top:2px">${exp < 100 ? (100 - exp) + '% untapped' : 'Full coverage'}</div>
+                </div>
+              </div>
+              <div style="flex:1;min-width:200px">
+                <div style="height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;margin-bottom:10px">
+                  <div style="height:100%;width:${exp}%;background:${expColor};border-radius:4px;transition:width 0.4s"></div>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                  ${channels.filter(ch => ch.weight > 0 || ch.active).map(ch => `
+                    <span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;background:${ch.active ? 'var(--green-bg)' : 'var(--bg2)'};color:${ch.active ? 'var(--green-text)' : 'var(--text3)'};border:1px solid ${ch.active ? 'var(--green-border)' : 'var(--border)'}">
+                      ${ch.label}${ch.weight > 0 ? ' · ' + ch.weight + '%' : ''}${ch.note ? ' · ' + ch.note : ''}
+                    </span>`).join('')}
+                </div>
+              </div>
+            </div>`;
+        })()}
+      </div>
+
+      <!-- INBOUND -->
+      <div class="sec">
+        ${(() => {
+          const channels = [
+            { label: 'MLS', data: l.inMls, listed: l.mls, sub: l.dom !== null ? l.dom + 'd DOM' : null, badge: 'b-bl' },
+            { label: 'Facebook Marketplace', data: l.inFb, listed: l.fb, sub: null, badge: 'b-p' },
+            { label: 'MaxAcres.com', data: l.inWeb, listed: false, sub: null, badge: 'b-teal' },
+            { label: 'Sign Board', data: l.inSign, listed: l.signBoards, sub: null, badge: 'b-a' },
+            { label: 'Realtor Campaign', data: l.inRealtor, listed: false, sub: null, badge: 'b-bl' },
+            { label: 'Investor Base', data: l.inInvestor, listed: false, sub: null, badge: 'b-teal' },
+            { label: 'Buyer Base', data: l.inBuyer, listed: false, sub: null, badge: 'b-p' },
+            { label: 'Neighbor', data: l.inNeighbor, listed: l.neighbor, sub: null, badge: 'b-a' },
+          ];
+          const totalInbound = channels.reduce((s, c) => s + (c.data ? c.data.sourced : 0), 0);
+          const hasData = channels.some(c => c.data && c.data.sourced > 0);
+
+          const pills = channels.map(c => {
+            const hasLeads = c.data && c.data.sourced > 0;
+            const bg = hasLeads ? 'var(--green-bg)' : 'var(--bg2)';
+            const color = hasLeads ? 'var(--green-text)' : c.listed ? 'var(--text2)' : 'var(--text3)';
+            const border = hasLeads ? 'var(--green-border)' : c.listed ? 'var(--border2)' : 'var(--border)';
+            const leadCount = hasLeads ? ` · ${c.data.sourced} leads` : '';
+            return `<span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;background:${bg};color:${color};border:1px solid ${border}">${c.label}${c.sub ? ' · ' + c.sub : ''}${leadCount}</span>`;
+          }).join('');
+
+          const rows = hasData ? channels.filter(c => c.data && c.data.sourced > 0).map(c => `
+            <tr>
+              <td><span class="badge ${c.badge}">${c.label}</span></td>
+              <td style="text-align:center;font-weight:600">${c.data.sourced}</td>
+              <td style="text-align:center;font-weight:600">${c.data.appt}</td>
+              <td style="text-align:center;font-weight:600">${c.data.qual}</td>
+              <td style="text-align:center;font-weight:600">${c.data.noEmd}</td>
+              <td style="text-align:center;font-weight:600;color:var(--green-text)">${c.data.emd}</td>
+            </tr>`).join('') + `
+            <tr style="border-top:2px solid var(--border);background:var(--bg3)">
+              <td style="font-weight:700;font-size:11px">TOTAL</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+(c.data?.sourced||0),0)}</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+(c.data?.appt||0),0)}</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+(c.data?.qual||0),0)}</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+(c.data?.noEmd||0),0)}</td>
+              <td style="text-align:center;font-weight:700;color:var(--green-text)">${channels.reduce((s,c) => s+(c.data?.emd||0),0)}</td>
+            </tr>`
+          : `<tr><td colspan="6"><div class="no-data">No inbound leads recorded yet for this listing</div></td></tr>`;
+
+          return `
+            <div class="sec-title">Inbound${totalInbound > 0 ? ' · ' + totalInbound + ' total leads' : ''}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">${pills}</div>
+            <div class="data-tbl-wrap">
+              <table class="data-tbl">
+                <thead><tr>
+                  <th>Source</th><th style="text-align:center">Sourced</th><th style="text-align:center">Appt set</th><th style="text-align:center">Qualified</th><th style="text-align:center">w/o EMD</th><th style="text-align:center">w/ EMD</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>`;
+        })()}
+      </div>
+
+      <!-- OUTBOUND -->
+      <div class="sec">
+        <div class="sec-title">Outbound${aggCamps.length > 0 ? ' · ' + aggCamps.length + ' campaign' + (aggCamps.length !== 1 ? 's' : '') + ' · ' + ol.length + ' leads' : ''}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+          ${['Realtor','Investor Base','Buyer Base','Neighbor'].map((label, idx) => {
+            const keywords = ['realtor','investor','buyer base','neighbor'];
+            const ranAgg = aggCamps.some(c => c.type.toLowerCase().includes(keywords[idx]));
+            const ranLc = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes(keywords[idx]));
+            const ran = ranAgg || ranLc;
+            const lastAgg = aggCamps.filter(c => c.type.toLowerCase().includes(keywords[idx])).sort((a,b) => new Date(b.date)-new Date(a.date))[0];
+            const dateStr = lastAgg ? ' · ' + fmtDate(lastAgg.date) : '';
+            return `<span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;background:${ran ? 'var(--green-bg)' : 'var(--bg2)'};color:${ran ? 'var(--green-text)' : 'var(--text3)'};border:1px solid ${ran ? 'var(--green-border)' : 'var(--border)'}">${label}${dateStr}</span>`;
+          }).join('')}
+        </div>
+        <div class="data-tbl-wrap">
+          <table class="data-tbl">
+            <thead><tr>
+              <th>Campaign</th><th>Date</th><th>Sourced</th><th>Appt set</th><th>Qualified</th><th>Contract sent</th><th>UC w/ EMD</th>
+            </tr></thead>
+            <tbody>${campRows}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SALES FEEDBACK -->
+      <div class="sec">
+        <div class="sec-title">Sales feedback</div>
+        ${lf.length > 0 ? lf.sort((a, b) => new Date(b['Date'] || 0) - new Date(a['Date'] || 0)).map(fb => {
+          const pod = fb['POD'] || fb['Closer'] || l.pod || '';
+          const date = fmtDate(fb['Date']);
+          const notes = fb['Notes'] || fb['Feedback'] || fb['Sales feedback'] || '';
+          const status = fb['Buyer status'] || fb['Buyer Status'] || '';
+          const podColor = pod.toLowerCase().includes('jose') ? 'var(--blue-text)' : pod.toLowerCase().includes('gabriel') ? 'var(--teal-text)' : 'var(--text3)';
+          return `<div style="padding:10px 0;border-bottom:0.5px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+              <span style="font-size:11px;font-weight:600;color:${podColor}">${pod || 'Closer'}</span>
+              <span style="font-size:10px;color:var(--text3)">${date}${status ? ' · ' + status : ''}</span>
+            </div>
+            <div style="font-size:12px;color:var(--text);line-height:1.5">${notes || 'No notes recorded'}</div>
+          </div>`;
+        }).join('') : `<div class="no-data">No sales feedback yet — Jose and Gabriel add notes in the activity log</div>`}
+      </div>
+
+    </div>
+
+    <div class="close-bar">
+      <span class="close-meta">${l.id} · ${l.addr} · LEI ${calcExposure(l, lc, ol)}%</span>
+      <button class="close-btn" onclick="closeCard()">Close card</button>
+    </div>
+  </div>`;
+
+  document.getElementById('cardArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => renderCharts(id, savesData, priceData), 150);
+}
+
+function closeCard() {
+  activeCardId = null;
+  destroyCharts();
+  document.getElementById('cardArea').innerHTML = '';
+  renderPortfolio();
+}
+
+// ── CHART DATA ────────────────────────────────────────────────────────────
+function genSavesHistory(l) {
+  if (l.saves === null) return [0, 0, 0, 0];
+  const c = l.saves;
+  if (l.daysDrop !== null && l.daysDrop < 14 && l.drops > 0) return [Math.max(0, c - 12), Math.max(0, c - 7), Math.max(0, c - 3), c];
+  if (l.daysDrop !== null && l.daysDrop > 14) return [c + 8, c + 5, c + 2, c];
+  return [Math.max(0, c - 5), Math.max(0, c - 3), Math.max(0, c - 1), c];
+}
+
+function genPriceHistory(l) {
+  if (!l.listP) return [];
+  const c = l.listP, drops = l.drops || 0, pct = l.pricePct || 0;
+  if (drops === 0) return [c, c];
+  const orig = pct > 0 ? Math.round(c / (1 - pct)) : c + drops * 2000;
+  if (drops === 1) return [orig, c];
+  if (drops === 2) return [orig, Math.round((orig + c) / 2), c];
+  const step = (orig - c) / drops;
+  return Array.from({ length: Math.min(drops + 1, 7) }, (_, i) => Math.round(orig - i * step));
+}
+
+// ── CHART RENDER ──────────────────────────────────────────────────────────
+function renderCharts(id, savesData, priceData) {
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const textColor = dark ? '#9b9a94' : '#888780';
+  const gridColor = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const labels4 = ['3 weeks ago', '2 weeks ago', 'Last week', 'This week'];
+
+  const sc = document.getElementById('savesChart_' + id);
+  if (sc) {
+    activeCharts['sc_' + id] = new Chart(sc, {
+      type: 'line',
+      data: {
+        labels: labels4.slice(-savesData.length),
+        datasets: [{
+          label: 'Saves', data: savesData,
+          borderColor: '#378add', backgroundColor: 'rgba(55,138,221,0.1)',
+          borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#378add',
+          tension: 0.35, fill: true
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: textColor, font: { size: 9 } }, grid: { color: gridColor } }, y: { ticks: { color: textColor, font: { size: 9 } }, grid: { color: gridColor }, beginAtZero: true } } }
+    });
+  }
+
+  const pc = document.getElementById('priceChart_' + id);
+  if (pc && priceData.length > 0) {
+    const priceLabels = priceData.map((_, i) => i === 0 ? 'Original' : i === priceData.length - 1 ? 'Current' : 'Drop ' + i);
+    activeCharts['pc_' + id] = new Chart(pc, {
+      type: 'line',
+      data: {
+        labels: priceLabels,
+        datasets: [{
+          label: 'Price', data: priceData,
+          borderColor: '#e24b4a', backgroundColor: 'rgba(226,75,74,0.07)',
+          borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#e24b4a',
+          tension: 0, fill: true
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: textColor, font: { size: 9 } }, grid: { color: gridColor } },
+          y: { ticks: { color: textColor, font: { size: 9 }, callback: v => '$' + Math.round(v / 1000) + 'k' }, grid: { color: gridColor } }
+        }
+      }
+    });
+  }
+}
+
+function destroyCharts() {
+  Object.keys(activeCharts).forEach(k => { activeCharts[k].destroy(); delete activeCharts[k]; });
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────────────
+function togglePriceStale() { priceStaleFilter = !priceStaleFilter; closeCard(); renderPortfolio(); }
+function toggleNoMls() { noMlsFilter = !noMlsFilter; closeCard(); renderPortfolio(); }
+
+function buildTitleButtons() {
+  const titles = [...new Set(listings.map(l => l.title).filter(Boolean))].sort();
+  const container = document.getElementById('titleButtons');
+  const labelMap = {
+    'Clear / Commit': 'Clear / Commit',
+    'Clear / Commit NA': 'Clear / Commit NA',
+    'Complex / Commit': 'Complex / Commit',
+    'Curable / Commit': 'Curable / Commit',
+    'Unprocessed': 'Unprocessed',
+    'Prem Title DD In Process (off shore)': 'Title DD In Process',
+  };
+  container.innerHTML = titles.map(t =>
+    `<button class="fb title-btn" style="margin-left:4px" onclick="ftitle('${t.replace(/'/g,"\\'")}',this)">${labelMap[t] || t}</button>`
+  ).join('');
+  document.getElementById('titleFilterRow').style.display = 'flex';
+}
+
+function ftitle(val, btn) {
+  if (val === 'all') {
+    titleFilter = [];
+    document.querySelectorAll('.title-btn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+  } else {
+    document.querySelector('.title-all-btn').classList.remove('on');
+    const idx = titleFilter.indexOf(val);
+    if (idx === -1) { titleFilter.push(val); btn.classList.add('on'); }
+    else { titleFilter.splice(idx, 1); btn.classList.remove('on'); }
+    if (titleFilter.length === 0) document.querySelector('.title-all-btn').classList.add('on');
+  }
+  closeCard(); renderPortfolio();
+}
+
+function buildStateButtons() {
+  const states = [...new Set(listings.map(l => l.state).filter(Boolean))].sort();
+  const container = document.getElementById('stateButtons');
+  container.innerHTML = states.map(s =>
+    `<button class="fb state-btn" style="margin-left:4px" onclick="fstate('${s}',this)">${s}</button>`
+  ).join('');
+  document.getElementById('stateFilterRow').style.display = 'flex';
+}
+
+function fstate(val, btn) {
+  if (val === 'all') {
+    stateFilter = [];
+    document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+  } else {
+    document.querySelector('.state-all-btn').classList.remove('on');
+    const idx = stateFilter.indexOf(val);
+    if (idx === -1) { stateFilter.push(val); btn.classList.add('on'); }
+    else { stateFilter.splice(idx, 1); btn.classList.remove('on'); }
+    if (stateFilter.length === 0) document.querySelector('.state-all-btn').classList.add('on');
+  }
+  closeCard(); renderPortfolio();
+}
+
+function fdropAge(val, btn) {
+  dropAgeFilter = val;
+  btn.closest('.filter-section').querySelectorAll('.fb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  closeCard(); renderPortfolio();
+}
+
+function clearAllFilters() {
+  podFilter = 'all'; stageFilter = []; expiryFilter = 'all'; stateFilter = [];
+  titleFilter = []; peiFilter = 'all'; dropsFilter = 'all'; dropAgeFilter = 'all';
+  priceStaleFilter = false; noMlsFilter = false;
+  // Reset all button states
+  document.querySelectorAll('.fb').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.stage-all-btn, .title-all-btn, .state-all-btn').forEach(b => b.classList.add('on'));
+  document.querySelectorAll('.filter-section').forEach(sec => {
+    const first = sec.querySelector('.fb');
+    if (first) first.classList.add('on');
+  });
+  closeCard(); renderPortfolio();
+}
+
+function fdrops(val, btn) {
+  dropsFilter = val;
+  btn.closest('.filter-section').querySelectorAll('.fb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  closeCard(); renderPortfolio();
+}
+
+function fpei(val, btn) {
+  peiFilter = val;
+  btn.closest('.filter-section').querySelectorAll('.fb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  closeCard(); renderPortfolio();
+}
+
+function fpod(val, btn) {
+  podFilter = val;
+  btn.closest('.filter-section').querySelectorAll('.fb').forEach(b => { if (['All','Jose','Gabriel'].includes(b.textContent.trim())) b.classList.remove('on'); });
+  btn.classList.add('on');
+  closeCard(); renderPortfolio();
+}
+
+function fexpiry(val, btn) {
+  expiryFilter = val;
+  document.querySelectorAll('.filter-section .fb').forEach(b => {
+    if (['All','Under 15 days','15–30 days','30–60 days','60+ days'].includes(b.textContent.trim())) b.classList.remove('on');
+  });
+  btn.classList.add('on');
+  closeCard(); renderPortfolio();
+}
+
+function fstage(val, btn) {
+  if (val === 'all') {
+    stageFilter = [];
+    document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+  } else {
+    const allBtn = document.querySelector('.stage-all-btn');
+    allBtn.classList.remove('on');
+    const idx = stageFilter.indexOf(val);
+    if (idx === -1) {
+      stageFilter.push(val);
+      btn.classList.add('on');
+    } else {
+      stageFilter.splice(idx, 1);
+      btn.classList.remove('on');
+    }
+    if (stageFilter.length === 0) {
+      allBtn.classList.add('on');
+    }
+  }
+  closeCard(); renderPortfolio();
+}
+</script>
+</body>
+</html>
