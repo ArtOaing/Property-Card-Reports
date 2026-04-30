@@ -1431,7 +1431,7 @@ function showCard(id) {
       <!-- DEAL ECONOMICS -->
       <div class="sec">
         <div class="sec-title">Deal economics</div>
-        <div style="display:grid;grid-template-columns:repeat(${pdf.pricingOption === 'With Seller Financing' ? '13' : '8'},1fr);gap:8px">
+        <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:8px">
           <div class="mc">
             <div class="mc-l">Contract price</div>
             <div class="mc-v">${fmt(pdf.contractP)}</div>
@@ -1443,41 +1443,15 @@ function showCard(id) {
             <div class="mc-s">At listing</div>
           </div>
           <div class="mc">
-            <div class="mc-l">Current list price</div>
-            <div class="mc-v">${fmt(listPrice)}</div>
-            <div class="mc-s">${dropCount} drop${dropCount !== 1 ? 's' : ''}</div>
-          </div>
-          <div class="mc">
             <div class="mc-l">Pricing option</div>
             <div class="mc-v" style="font-size:13px;color:${pdf.pricingOption === 'With Seller Financing' ? 'var(--teal-text)' : 'var(--text)'}">${pdf.pricingOption === 'With Seller Financing' ? 'Seller Finance' : 'Cash Only'}</div>
             <div class="mc-s">${pdf.pricingOption === 'With Seller Financing' ? 'SF active' : 'No SF'}</div>
           </div>
-          ${pdf.pricingOption === 'With Seller Financing' ? `
           <div class="mc">
-            <div class="mc-l">SF price</div>
-            <div class="mc-v" style="color:var(--teal-text)">${pdf.sfPrice ? fmt(pdf.sfPrice) : '—'}</div>
-            <div class="mc-s">Seller financing</div>
+            <div class="mc-l">Current cash list price</div>
+            <div class="mc-v">${fmt(listPrice)}</div>
+            <div class="mc-s">${dropCount} drop${dropCount !== 1 ? 's' : ''}</div>
           </div>
-          <div class="mc">
-            <div class="mc-l">Down payment</div>
-            <div class="mc-v" style="color:var(--teal-text)">${pdf.sfDownPayment ? fmt(pdf.sfDownPayment) : '—'}</div>
-            <div class="mc-s">Required down</div>
-          </div>
-          <div class="mc">
-            <div class="mc-l">Loan amount</div>
-            <div class="mc-v" style="color:var(--teal-text)">${pdf.sfLoanAmount ? fmt(pdf.sfLoanAmount) : '—'}</div>
-            <div class="mc-s">Balance financed</div>
-          </div>
-          <div class="mc">
-            <div class="mc-l">Interest rate</div>
-            <div class="mc-v" style="font-size:15px;color:var(--teal-text)">${pdf.sfInterest ? pdf.sfInterest : '—'}</div>
-            <div class="mc-s">Annual rate</div>
-          </div>
-          <div class="mc">
-            <div class="mc-l">Monthly payment</div>
-            <div class="mc-v" style="color:var(--teal-text)">${pdf.sfMonthly ? fmt(pdf.sfMonthly) : '—'}</div>
-            <div class="mc-s">Per month</div>
-          </div>` : ''}
           <div class="mc">
             <div class="mc-l">Last list price</div>
             <div class="mc-v">${fmt(lastListPrice)}</div>
@@ -1499,6 +1473,37 @@ function showCard(id) {
             <div class="mc-s">${l.contractDate ? 'Signed: ' + fmtDate(l.contractDate) : '—'}</div>
           </div>
         </div>
+        ${pdf.pricingOption === 'With Seller Financing' ? `
+        <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border)">
+          <div style="font-size:10px;font-weight:600;color:var(--teal-text);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Seller financing details</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+            <div class="mc" style="border:1px solid var(--teal-bg)">
+              <div class="mc-l">SF price</div>
+              <div class="mc-v" style="color:var(--teal-text)">${pdf.sfPrice ? fmt(pdf.sfPrice) : '—'}</div>
+              <div class="mc-s">Total financed price</div>
+            </div>
+            <div class="mc" style="border:1px solid var(--teal-bg)">
+              <div class="mc-l">Down payment</div>
+              <div class="mc-v" style="color:var(--teal-text)">${pdf.sfDownPayment ? fmt(pdf.sfDownPayment) : '—'}</div>
+              <div class="mc-s">Required down</div>
+            </div>
+            <div class="mc" style="border:1px solid var(--teal-bg)">
+              <div class="mc-l">Loan amount</div>
+              <div class="mc-v" style="color:var(--teal-text)">${pdf.sfLoanAmount ? fmt(pdf.sfLoanAmount) : '—'}</div>
+              <div class="mc-s">Balance financed</div>
+            </div>
+            <div class="mc" style="border:1px solid var(--teal-bg)">
+              <div class="mc-l">Interest rate</div>
+              <div class="mc-v" style="font-size:15px;color:var(--teal-text)">${pdf.sfInterest || '—'}</div>
+              <div class="mc-s">Annual rate</div>
+            </div>
+            <div class="mc" style="border:1px solid var(--teal-bg)">
+              <div class="mc-l">Monthly payment</div>
+              <div class="mc-v" style="color:var(--teal-text)">${pdf.sfMonthly ? fmt(pdf.sfMonthly) : '—'}</div>
+              <div class="mc-s">Per month</div>
+            </div>
+          </div>
+        </div>` : ''}
       </div>
 
       <!-- ZILLOW -->
