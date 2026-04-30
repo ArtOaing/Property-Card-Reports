@@ -1220,15 +1220,16 @@ function showCard(id) {
           const listPct = listDate ? pct(listDate.getTime()) : null;
 
           // Real price drop dots from price drop report
+          const origPriceEntry = pdHistory.find(d => d.label === 'Original');
           const realDrops = pdHistory
             .filter(d => d.date && d.label !== 'Original')
             .map(d => ({ date: new Date(d.date), price: d.price, label: d.label }))
-            .filter(d => !isNaN(d.date.getTime()) && d.date >= contractDate && d.date <= expiryDate)
+            .filter(d => !isNaN(d.date.getTime()))
             .sort((a, b) => a.date - b.date);
 
           // Build milestones — fixed alternating above/below
           const milestones = [
-            { pct: 0, color: 'var(--green-border)', label: 'Contracted', date: fmtShort(contractDate), above: false },
+            { pct: 0, color: 'var(--green-border)', label: origPriceEntry ? fmt(origPriceEntry.price) : 'Contracted', date: fmtShort(contractDate), above: false },
             ...(listPct !== null ? [{ pct: listPct, color: 'var(--blue-border)', label: 'Listed', date: fmtShort(listDate), above: true }] : []),
             ...realDrops.map((d, i) => ({
               pct: pct(d.date.getTime()),
