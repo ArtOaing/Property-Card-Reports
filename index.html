@@ -984,59 +984,56 @@ function showCard(id) {
     };
 
     if (dispoSorted.length > 0) {
-      // Only show campaigns with at least one lead activity
-      const active = dispoSorted.filter(c => {
-        const key = (c['Campaign Objective']||'').trim() + '||' + (c['Campaign Run Date']||'');
-        const leads = leadsMap[key];
-        return leads && (leads.sourced > 0 || leads.appt > 0 || leads.qual > 0 || leads.emd > 0);
-      });
-      const inactive = dispoSorted.filter(c => {
-        const key = (c['Campaign Objective']||'').trim() + '||' + (c['Campaign Run Date']||'');
-        const leads = leadsMap[key];
-        return !leads || (leads.sourced === 0 && leads.appt === 0 && leads.qual === 0 && leads.emd === 0);
-      });
-
-      const renderRow = (c, dimmed) => {
+      // Render ALL campaigns — zero-lead ones dimmed
+      const renderRow = (c) => {
         const obj = (c['Campaign Objective'] || '').trim();
         const date = c['Campaign Run Date'] || '';
         const pod = c['POD Team Name'] || '';
         const members = parseInt(c['Actual Campaign Members'] || 0);
         const key = obj + '||' + date;
         const leads = leadsMap[key] || {};
-        const safeBase = btoa(key).replace(/[^a-zA-Z0-9]/g,'').substring(0,12);
+        const hasAnyLeads = (leads.sourced||0) > 0 || (leads.appt||0) > 0 || (leads.qual||0) > 0 || (leads.emd||0) > 0;
+        // Use full key hash to avoid collisions
+        const safeBase = 'c' + Math.abs(key.split('').reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0)|0,0)).toString(36);
 
-        // Extract lead rows for each clickable cell
         const sourcedLeads = (leadsDetail[key]||[]).filter(r => r.sourced > 0);
         const apptLeads = (leadsDetail[key]||[]).filter(r => r.appt > 0);
         const qualLeads = (leadsDetail[key]||[]).filter(r => r.qual > 0);
         const emdLeads = (leadsDetail[key]||[]).filter(r => r.emd > 0);
 
-        const mkBtn = (val, leads, suffix) => {
+        const mkBtn = (val, leadList, suffix) => {
           if (!val || val === 0) return `<span style="color:var(--text3)">0</span>`;
-          if (leads.length === 0) return `<span style="font-weight:600">${val}</span>`;
+          if (leadList.length === 0) return `<span style="font-weight:600">${val}</span>`;
           const safeKey = safeBase + suffix;
           return `<span onclick="toggleCampLeads('${safeKey}')" style="font-weight:700;color:var(--blue-text);cursor:pointer;text-decoration:underline dotted" title="Click to see leads">${val} ▾</span>`;
         };
 
-        const mkDetail = (leads, suffix) => {
-          if (leads.length === 0) return '';
+        const mkDetail = (leadList, suffix) => {
+          if (leadList.length === 0) return '';
           const safeKey = safeBase + suffix;
-          return `<tr id="leads_${safeKey}" style="display:none"><td colspan="9" style="padding:0 0 8px 24px;background:var(--bg3)">
-            <table style="width:auto;font-size:10px;border-collapse:collapse">
-              <tr style="color:var(--text3)"><td style="padding:3px 10px">Name</td><td>Status</td><td>Source</td><td>Appt scheduled</td></tr>
-              ${leads.map(r => `<tr style="border-top:0.5px solid var(--border)">
-                <td style="padding:3px 10px;font-weight:500;color:var(--text)">${r.name}</td>
-                <td style="padding:3px 10px;color:var(--text2)">${r.status}</td>
-                <td style="padding:3px 10px;color:var(--text3)">${r.source}</td>
-                <td style="padding:3px 10px;color:${r.apptSched ? 'var(--blue-text)' : 'var(--text3)'}${r.apptSched ? ';font-weight:500' : ''}">${r.apptSched || '—'}</td>
-              </tr>`).join('')}
-            </table>
-          </td></tr>`;
+          return `<tr id="leads_${safeKey}" style="display:none">
+            <td colspan="9" style="padding:8px 8px 12px 32px;background:var(--bg3);border-bottom:0.5px solid var(--border)">
+              <table style="width:100%;font-size:11px;border-collapse:collapse;background:var(--bg2);border-radius:6px;overflow:hidden">
+                <thead><tr style="background:var(--bg3)">
+                  <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Name</th>
+                  <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Status</th>
+                  <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Source</th>
+                  <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Appt scheduled</th>
+                </tr></thead>
+                <tbody>
+                  ${leadList.map((r, i) => `<tr style="border-top:0.5px solid var(--border);${i%2===1?'background:var(--bg3)':''}">
+                    <td style="padding:8px 14px;font-weight:600;color:var(--text)">${r.name}</td>
+                    <td style="padding:8px 14px;color:var(--text2)">${r.status}</td>
+                    <td style="padding:8px 14px;color:var(--text3)">${r.source}</td>
+                    <td style="padding:8px 14px;color:${r.apptSched ? 'var(--blue-text)' : 'var(--text3)'};font-weight:${r.apptSched ? '500' : '400'}">${r.apptSched || '—'}</td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>
+            </td>
+          </tr>`;
         };
 
-        const apptSchedStr = leads.apptSched ? `<div style="font-size:9px;color:var(--blue-text)">${fmtDate(leads.apptSched)}</div>` : '';
-
-        return `<tr style="${dimmed ? 'opacity:0.45' : ''}">
+        return `<tr style="${!hasAnyLeads ? 'opacity:0.4' : ''}">
           <td><span class="badge ${campTypeClass(obj)}">${obj}</span></td>
           <td>${fmtDate(date)}</td>
           <td style="text-align:center;color:var(--text3)">${members ? members.toLocaleString() : '—'}</td>
@@ -1044,7 +1041,7 @@ function showCard(id) {
           <td style="text-align:center">${mkBtn(leads.appt||0, apptLeads, 'a')}${leads.apptSched ? `<div style="font-size:9px;color:var(--blue-text);font-weight:500">${leads.apptSched}</div>` : ''}</td>
           <td style="text-align:center">${mkBtn(leads.qual||0, qualLeads, 'q')}</td>
           <td style="text-align:center;font-weight:${(leads.contractSent||0)>0?'600':'400'};color:${(leads.contractSent||0)>0?'var(--text)':'var(--text3)'}">${leads.contractSent||0}</td>
-          <td style="text-align:center;font-weight:${(leads.emd||0)>0?'700':'400'};color:${(leads.emd||0)>0?'var(--green-text)':'var(--text3)'}">${mkBtn(leads.emd||0, emdLeads, 'e')}</td>
+          <td style="text-align:center">${mkBtn(leads.emd||0, emdLeads, 'e')}</td>
           <td style="font-size:10px;color:var(--text3)">${pod}</td>
         </tr>
         ${mkDetail(sourcedLeads, 's')}
@@ -1064,9 +1061,7 @@ function showCard(id) {
         <td></td>
       </tr>`;
 
-      return active.map(c => renderRow(c, false)).join('') +
-             (inactive.length > 0 ? `<tr><td colspan="9" style="padding:6px 14px;font-size:10px;color:var(--text3);background:var(--bg2);border-top:0.5px solid var(--border)">${inactive.length} campaign${inactive.length!==1?'s':''} ran with no leads recorded</td></tr>` : '') +
-             totalsRow;
+      return dispoSorted.map(c => renderRow(c)).join('') + totalsRow;
     }
 
     // Fallback: leads-only aggregation
