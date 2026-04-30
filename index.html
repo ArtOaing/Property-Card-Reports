@@ -1199,7 +1199,45 @@ function showCard(id) {
                 ${milestones.map(dotHtml).join('')}
               </div>
             </div>
-            ${realDrops.length > 0 ? '' : pdOk ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;text-align:center">No price drop dates in report for this listing</div>' : ''}`;
+            ${(() => {
+              // Build price trend line below the timeline
+              if (realDrops.length === 0) return pdOk ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;text-align:center">No price drop dates in report for this listing</div>' : '';
+              // All price points: original at contract start, then each drop, then current at today
+              const origPrice = pdHistory.find(d => d.label === 'Original');
+              const pricePoints = [
+                ...(origPrice ? [{ pctX: 0, price: origPrice.price, isOrig: true }] : []),
+                ...realDrops.map(d => ({ pctX: pct(d.date.getTime()), price: d.price })),
+                { pctX: todayPct, price: realDrops[realDrops.length-1]?.price || origPrice?.price, isToday: true }
+              ].filter(p => p.price);
+              if (pricePoints.length < 2) return '';
+              const prices = pricePoints.map(p => p.price);
+              const minP = Math.min(...prices), maxP = Math.max(...prices);
+              const range = maxP - minP || 1;
+              const H = 48; // height of the price chart area
+              const yPct = p => ((maxP - p) / range) * (H - 12) + 6;
+              const pts = pricePoints.map(p => `${p.pctX},${yPct(p.price)}`).join(' ');
+              // Area fill points
+              const areaPath = `0,${H} ` + pricePoints.map(p => `${p.pctX},${yPct(p.price)}`).join(' ') + ` ${pricePoints[pricePoints.length-1].pctX},${H}`;
+              return `
+                <div style="position:relative;height:${H}px;margin:4px 8px 0">
+                  <svg width="100%" height="${H}" viewBox="0 0 100 ${H}" preserveAspectRatio="none" style="position:absolute;top:0;left:0;width:100%;height:100%">
+                    <defs>
+                      <linearGradient id="priceGrad_${id}" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#e24b4a" stop-opacity="0.25"/>
+                        <stop offset="100%" stop-color="#e24b4a" stop-opacity="0.02"/>
+                      </linearGradient>
+                    </defs>
+                    <polygon points="${areaPath}" fill="url(#priceGrad_${id})"/>
+                    <polyline points="${pts}" fill="none" stroke="#e24b4a" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+                    ${pricePoints.map(p => `
+                      <circle cx="${p.pctX}" cy="${yPct(p.price)}" r="${p.isOrig || p.isToday ? 2.5 : 2}" fill="${p.isOrig ? '#9b9a94' : p.isToday ? '#e24b4a' : '#ef9f27'}" vector-effect="non-scaling-stroke"/>
+                    `).join('')}
+                  </svg>
+                  <div style="position:absolute;left:0;top:2px;font-size:9px;color:var(--text3)">${fmt(maxP)}</div>
+                  <div style="position:absolute;left:0;bottom:2px;font-size:9px;color:var(--text3)">${fmt(minP)}</div>
+                  <div style="position:absolute;right:0;top:${yPct(pricePoints[pricePoints.length-1].price) - 8}px;font-size:9px;font-weight:600;color:var(--red-text)">${fmt(pricePoints[pricePoints.length-1].price)}</div>
+                </div>`;
+            })()}`;
         })()}
       </div>
 
