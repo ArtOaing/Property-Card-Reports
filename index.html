@@ -1620,14 +1620,28 @@ function genSavesHistory(l) {
 }
 
 function genPriceHistory(l) {
+  // Use real price drop history from the price drop report
+  const pdRow = l.mainListing ? getPriceDrop(l.mainListing) : null;
+  const history = parsePriceDropHistory(pdRow);
+  if (history.length >= 2) {
+    return history.map((d, i) => ({
+      label: d.label,
+      price: d.price,
+      date: d.date
+    }));
+  }
+  // Fallback — build from Salesforce fields
   if (!l.listP) return [];
   const c = l.listP, drops = l.drops || 0, pct = l.pricePct || 0;
-  if (drops === 0) return [c, c];
+  if (drops === 0) return [{ label: 'Original', price: c, date: null }, { label: 'Current', price: c, date: null }];
   const orig = pct > 0 ? Math.round(c / (1 - pct)) : c + drops * 2000;
-  if (drops === 1) return [orig, c];
-  if (drops === 2) return [orig, Math.round((orig + c) / 2), c];
+  if (drops === 1) return [{ label: 'Original', price: orig, date: null }, { label: 'Current', price: c, date: null }];
   const step = (orig - c) / drops;
-  return Array.from({ length: Math.min(drops + 1, 7) }, (_, i) => Math.round(orig - i * step));
+  return Array.from({ length: Math.min(drops + 1, 7) }, (_, i) => ({
+    label: i === 0 ? 'Original' : i === drops ? 'Current' : 'Drop ' + i,
+    price: Math.round(orig - i * step),
+    date: null
+  }));
 }
 
 // ── CHART RENDER ──────────────────────────────────────────────────────────
@@ -1656,23 +1670,73 @@ function renderCharts(id, savesData, priceData) {
 
   const pc = document.getElementById('priceChart_' + id);
   if (pc && priceData.length > 0) {
-    const priceLabels = priceData.map((_, i) => i === 0 ? 'Original' : i === priceData.length - 1 ? 'Current' : 'Drop ' + i);
+    const prices = priceData.map(d => d.price);
+    const labels = priceData.map(d => {
+      if (d.date) {
+        const dt = new Date(d.date);
+        if (!isNaN(dt)) return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+      return d.label;
+    });
+
+    // Color each point: original = grey, drops = amber, current = red
+    const pointColors = priceData.map((d, i) => {
+      if (i === 0) return '#9b9a94';
+      if (i === priceData.length - 1) return '#e24b4a';
+      return '#ef9f27';
+    });
+    const pointRadii = priceData.map((d, i) =>
+      i === 0 || i === priceData.length - 1 ? 6 : 4
+    );
+
     activeCharts['pc_' + id] = new Chart(pc, {
       type: 'line',
       data: {
-        labels: priceLabels,
+        labels,
         datasets: [{
-          label: 'Price', data: priceData,
-          borderColor: '#e24b4a', backgroundColor: 'rgba(226,75,74,0.07)',
-          borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#e24b4a',
-          tension: 0, fill: true
+          label: 'Price',
+          data: prices,
+          borderColor: '#e24b4a',
+          backgroundColor: 'rgba(226,75,74,0.06)',
+          borderWidth: 2.5,
+          pointRadius: pointRadii,
+          pointBackgroundColor: pointColors,
+          pointBorderColor: pointColors,
+          stepped: false,
+          tension: 0,
+          fill: true
         }]
       },
       options: {
-        responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: ctx => '$' + ctx.parsed.y.toLocaleString(),
+              afterLabel: (ctx) => {
+                const d = priceData[ctx.dataIndex];
+                if (!d) return '';
+                const prev = ctx.dataIndex > 0 ? priceData[ctx.dataIndex - 1].price : null;
+                if (prev && d.price < prev) {
+                  const diff = prev - d.price;
+                  const pct = ((diff / prev) * 100).toFixed(1);
+                  return `↓ $${diff.toLocaleString()} (${pct}%)`;
+                }
+                return '';
+              }
+            }
+          }
+        },
         scales: {
           x: { ticks: { color: textColor, font: { size: 9 } }, grid: { color: gridColor } },
-          y: { ticks: { color: textColor, font: { size: 9 }, callback: v => '$' + Math.round(v / 1000) + 'k' }, grid: { color: gridColor } }
+          y: {
+            ticks: { color: textColor, font: { size: 9 }, callback: v => '$' + Math.round(v / 1000) + 'k' },
+            grid: { color: gridColor },
+            // Give some padding so the line doesn't hug the top/bottom
+            grace: '5%'
+          }
         }
       }
     });
