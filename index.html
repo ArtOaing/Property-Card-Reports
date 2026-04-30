@@ -645,7 +645,9 @@ function parsePriceDropHistory(pd) {
     drops.push({ date: finalDate, price: finalPrice, label: 'Final' });
   }
 
-  return drops;
+  const result = drops;
+  console.log('[PD History]', pd['Listing #'] || '?', result.map(d => d.label + ':' + d.price + ':' + d.date));
+  return result;
 }
 
 function getCamps(id) { return camps.filter(r => (gv(r,'SH ID','sh id') || '').toString().trim() === id.toString().trim()); }
@@ -1220,6 +1222,7 @@ function showCard(id) {
           const listPct = listDate ? pct(listDate.getTime()) : null;
 
           // Real price drop dots from price drop report
+          console.log('[Timeline] pdHistory for', l.mainListing, pdHistory);
           const origPriceEntry = pdHistory.find(d => d.label === 'Original');
           const realDrops = pdHistory
             .filter(d => d.date && d.label !== 'Original')
