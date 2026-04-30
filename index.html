@@ -370,13 +370,13 @@ let activeCardId = null;
 const activeCharts = {};
 
 // ── DATA SOURCES — GitHub raw CSV ───────────────────────────────────────────
-const BASE = 'https://raw.githubusercontent.com/ArtOaing/Property-Card-Reports/main/data/';
+const BASE = 'https://raw.githubusercontent.com/GoldSoilInc/Property-Card-Reports/main/data/';
 const SOURCES = {
   sf:     BASE + 'property-performance-report.csv',
   pd:     BASE + 'price-drop-report.csv',
   camp:   BASE + 'outbound-campaigns-leads.csv',
   zillow: BASE + 'zillow-reports.csv',
-  dispo:  BASE + 'dispo-campaigns.csv'
+  dispo:  BASE + 'dispo-campaigns'
 };
 
 function setDot(id, state) {
@@ -408,6 +408,7 @@ async function fetchCSV(key) {
   setDot(key, 'loading');
   try {
     const res = await fetch(SOURCES[key] + '?t=' + Date.now());
+    if (res.status === 404) { setDot(key, ''); return []; } // file not uploaded yet — grey
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     setDot(key, 'ok');
