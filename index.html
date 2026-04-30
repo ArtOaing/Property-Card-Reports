@@ -1193,12 +1193,13 @@ function showCard(id) {
             </div>`;
 
           return `
-            <div style="position:relative;height:100px;margin:0 8px">
-              <div style="position:absolute;top:50%;left:0;right:0;height:4px;background:var(--bg3);border-radius:2px;transform:translateY(-50%)">
-                <div style="position:absolute;left:0;top:0;height:100%;width:${todayPct}%;background:${barColor};border-radius:2px"></div>
-                ${milestones.map(dotHtml).join('')}
+            <div style="margin:0 8px">
+              <div style="position:relative;height:100px">
+                <div style="position:absolute;top:50%;left:0;right:0;height:4px;background:var(--bg3);border-radius:2px;transform:translateY(-50%)">
+                  <div style="position:absolute;left:0;top:0;height:100%;width:${todayPct}%;background:${barColor};border-radius:2px"></div>
+                  ${milestones.map(dotHtml).join('')}
+                </div>
               </div>
-            </div>
             ${(() => {
               // Build price trend line below the timeline
               if (realDrops.length === 0) return pdOk ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;text-align:center">No price drop dates in report for this listing</div>' : '';
@@ -1237,7 +1238,7 @@ function showCard(id) {
                   <div style="position:absolute;left:0;bottom:2px;font-size:9px;color:var(--text3)">${fmt(minP)}</div>
                   <div style="position:absolute;right:0;top:${yPct(pricePoints[pricePoints.length-1].price) - 8}px;font-size:9px;font-weight:600;color:var(--red-text)">${fmt(pricePoints[pricePoints.length-1].price)}</div>
                 </div>`;
-            })()}`;
+            })()}</div>`;
         })()}
       </div>
 
