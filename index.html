@@ -520,7 +520,13 @@ function enrichListingsFromPriceDrop() {
   listings.forEach(l => {
     const pd = l.mainListing ? getPriceDrop(l.mainListing) : null;
     if (!pd) return;
-    const n = v => (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? parseFloat(v) : null;
+    const n = v => {
+      if (v === null || v === undefined || v === '') return null;
+      const str = String(v).replace(/[$,\s]/g, '');
+      if (str === '') return null;
+      const num = parseFloat(str);
+      return isNaN(num) ? null : num;
+    };
     const history = parsePriceDropHistory(pd);
     const drops = history.filter(d => d.label !== 'Original');
 
@@ -608,7 +614,14 @@ function getPriceDrop(mainListing) {
 function parsePriceDropHistory(pd) {
   if (!pd) return [];
   const drops = [];
-  const n = v => (v !== null && v !== undefined && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v) : null;
+  // Strip currency formatting before parsing so "$55,900" and "55,900" both parse correctly
+  const n = v => {
+    if (v === null || v === undefined || v === '') return null;
+    const str = String(v).replace(/[$,\s]/g, '');
+    if (str === '') return null;
+    const num = parseFloat(str);
+    return isNaN(num) ? null : num;
+  };
 
   // Helper — case-insensitive trimmed key lookup, accepts multiple key variants
   const get = (obj, ...keys) => {
@@ -1252,23 +1265,52 @@ function showCard(id) {
               .sort((a, b) => a.date - b.date);
           })();
 
-          // Original price as its own milestone — placed at listing date (or contract date as fallback)
-          const origAnchor = origPriceEntry ? (listDate || contractDate) : null;
-          const origMilestone = origAnchor ? {
-            pct: pct(origAnchor.getTime()),
-            color: 'var(--blue-border)',
-            label: fmt(origPriceEntry.price),
-            sublabel: 'Original',
-            date: fmtShort(origAnchor),
-            above: true,
-            isOriginal: true
-          } : null;
+          // DEBUG — log raw PD column values + parsed history so we can diagnose missing drops
+          if (pdRow) {
+            const pdSlots = {};
+            for (let i = 1; i <= 5; i++) {
+              pdSlots[`PD ${i}`] = {
+                price: pdRow[`PD ${i} Cash Price`] ?? pdRow[`PD${i} Cash Price`] ?? '(no col)',
+                date: pdRow[`Proposed Price Drop Date ${i}`] ?? pdRow[`Proposed Price Drop Date${i}`] ?? (i === 1 ? pdRow['Proposed Price Drop Date'] : null) ?? '(no col)'
+              };
+            }
+            pdSlots['Final'] = {
+              price: pdRow['Final PD Cash Price'] ?? pdRow['Final Cash Price'] ?? '(no col)',
+              date: pdRow['Proposed Final Price Drop Date'] ?? pdRow['Final PD Date'] ?? '(no col)'
+            };
+            console.log('[Timeline]', l.mainListing || l.id, '— raw PD slots:', pdSlots);
+            console.log('[Timeline]', l.mainListing || l.id, '— parsed pdHistory:', pdHistory);
+            console.log('[Timeline]', l.mainListing || l.id, '— rendered realDrops:', realDrops.map(d => ({ label: d.label, price: d.price, date: d.date.toISOString().slice(0,10), estimated: d.estimated })));
+          }
+
+          // Listed milestone — carries the original price as the headline label when we have one
+          const listedMilestone = listPct !== null
+            ? {
+                pct: listPct,
+                color: 'var(--blue-border)',
+                label: origPriceEntry ? fmt(origPriceEntry.price) : 'Listed',
+                sublabel: origPriceEntry ? 'Listed · Original' : null,
+                date: fmtShort(listDate),
+                above: true,
+                isOriginal: !!origPriceEntry
+              }
+            : (origPriceEntry
+                ? {
+                    pct: 0,
+                    color: 'var(--blue-border)',
+                    label: fmt(origPriceEntry.price),
+                    sublabel: 'Original',
+                    date: fmtShort(contractDate),
+                    above: true,
+                    isOriginal: true
+                  }
+                : null);
 
           // Build milestones — alternate above/below for drops to avoid label collisions
-          const dropOffset = (origMilestone || listPct !== null) ? 1 : 0;
+          const dropOffset = listedMilestone ? 1 : 0;
           const milestones = [
             { pct: 0, color: 'var(--green-border)', label: 'Contracted', date: fmtShort(contractDate), above: false },
-            ...(origMilestone ? [origMilestone] : (listPct !== null ? [{ pct: listPct, color: 'var(--blue-border)', label: 'Listed', date: fmtShort(listDate), above: true }] : [])),
+            ...(listedMilestone ? [listedMilestone] : []),
             ...realDrops.map((d, i) => ({
               pct: pct(d.date.getTime()),
               color: 'var(--amber-border)',
