@@ -341,6 +341,7 @@
           <th class="sortable" onclick="setSort('spread')">Spread <span class="sort-arrow">↕</span></th>
           <th class="sortable" onclick="setSort('dom')">DOM <span class="sort-arrow">↕</span></th>
           <th class="sortable" onclick="setSort('expiry')">Expiry <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="setSort('zdom')">ZDOM <span class="sort-arrow">↕</span></th>
           <th class="sortable" onclick="setSort('zViews')">ZViews <span class="sort-arrow">↕</span></th>
           <th class="sortable" onclick="setSort('saves')">ZSaves <span class="sort-arrow">↕</span></th>
           <th>Incoming</th>
@@ -491,7 +492,7 @@ function parseRow(row) {
     listP, contractP,
     lastListP: n(gv(row, 'Last Cash List Price')), profit: n(gv(row, 'Potential Profit')),
     equity: n(gv(row, 'Equity Capture')), pricePct: (() => { const v = gv(row, 'Price Drop %'); if (!v) return 0; const s = v.toString().replace('%','').trim(); return parseFloat(s) / (s.includes('.') && parseFloat(s) < 1 ? 1 : 100) || 0; })(),
-    saves: n(gv(row, 'Zillow Saves')), zViews: n(gv(row, 'Zillow Views', 'ZViews', 'Zillow_Views')), mlsSaves: n(gv(row, 'MLS Saves')),
+    saves: n(gv(row, 'Zillow Saves', 'ZSaves', 'Zillow_Saves', 'Saves', 'Z Saves')), zViews: n(gv(row, 'Zillow Views', 'ZViews', 'Zillow_Views', 'Views', 'Z Views')), mlsSaves: n(gv(row, 'MLS Saves')),
     zillowLink: gv(row, 'Zillow Link', 'Zillow URL', 'zillow link') || '',
     dom: n(gv(row, 'MLS DOM')), webDom: n(gv(row, 'Website DOM')),
     expiry: n(gv(row, '# of Days to Expiration')), drops: i(gv(row, '# of Price Drops')),
@@ -561,9 +562,11 @@ function enrichListingsFromZillow() {
     const zrow = zillowData.find(r => (gv(r, 'Listing #') || '').toString().trim() === l.mainListing.toString().trim());
     if (!zrow) return;
     const n = v => (v !== null && v !== undefined && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v) : null;
-    if (n(zrow['Zillow Saves']) !== null) l.saves = n(zrow['Zillow Saves']);
-    if (n(zrow['Zillow Views']) !== null) l.zViews = n(zrow['Zillow Views']);
-    if (n(zrow['MLS DOM']) !== null) l.dom = n(zrow['MLS DOM']);
+    // Property Performance Report is source of truth for saves/views/dom — only fill from Zillow CSV if Property Performance had no value
+    if (l.saves  === null && n(zrow['Zillow Saves']) !== null) l.saves  = n(zrow['Zillow Saves']);
+    if (l.zViews === null && n(zrow['Zillow Views']) !== null) l.zViews = n(zrow['Zillow Views']);
+    if (l.dom    === null && n(zrow['MLS DOM'])      !== null) l.dom    = n(zrow['MLS DOM']);
+    // Link and capture date are Zillow-CSV-only
     if (zrow['Zillow Link'] && !l.zillowLink) l.zillowLink = zrow['Zillow Link'];
     if (zrow['Date Captured']) l.zillowCaptured = zrow['Date Captured'];
   });
@@ -707,6 +710,16 @@ function categorizeInboundStatus(status) {
 }
 
 function aggregateInboundLeads(leads) {
+  // Tolerant lookup — handles Appointment Sched / Appointment Scheduled / Appt Sched / Appt Scheduled, any case, any spacing
+  const apptKey = (() => {
+    if (leads.length === 0) return null;
+    const variants = ['appointment sched', 'appointment scheduled', 'appt sched', 'appt scheduled'];
+    for (const k of Object.keys(leads[0])) {
+      if (variants.includes(k.toLowerCase().trim())) return k;
+    }
+    return null;
+  })();
+
   const map = {};
   leads.forEach(r => {
     const src = (r['Lead Source'] || '').toString().trim() || 'Unknown';
@@ -720,7 +733,7 @@ function aggregateInboundLeads(leads) {
       name: [r['First Name'], r['Last Name']].map(s => (s || '').trim()).filter(Boolean).join(' ') || '—',
       status: (r['Lead Status'] || '—').toString().trim(),
       source: src,
-      apptSched: (r['Appointment Sched'] || '').toString().trim()
+      apptSched: apptKey ? (r[apptKey] || '').toString().trim() : ''
     };
     map[src].total++;
     if (cats.sourced) { map[src].sourced++; map[src].sourcedLeads.push(lead); }
@@ -918,7 +931,8 @@ function renderPortfolio() {
         case 'listP': return l.listP || 0;
         case 'daysDrop': return l.daysDrop !== null ? l.daysDrop : 9999;
         case 'spread': return l.profit !== null && l.profit !== undefined ? l.profit : -Infinity;
-        case 'dom': return l.dom !== null ? l.dom : 9999;
+        case 'dom': return l.webDom !== null ? l.webDom : 9999;
+        case 'zdom': return l.dom !== null ? l.dom : 9999;
         case 'zViews': return l.zViews !== null ? l.zViews : -1;
         case 'saves': return l.saves !== null ? l.saves : -1;
         default: return l.expiry === null ? 9999 : l.expiry < 0 ? -9999 : l.expiry;
@@ -961,7 +975,8 @@ function renderPortfolio() {
     const spHtml = sp === null ? '—' : sp < 0 ? `<span class="red">${fmt(sp)}</span>` : sp < 10000 ? `<span class="amber">${fmt(sp)}</span>` : fmt(sp);
     const zViewsHtml = l.zViews === null ? '<span class="muted">—</span>' : `${l.zViews.toLocaleString()}`;
     const zSavesHtml = l.saves === null ? '<span class="muted">—</span>' : l.saves === 0 ? '<span class="red">0</span>' : l.saves < 10 ? `<span class="amber">${l.saves}</span>` : `<span class="green">${l.saves}</span>`;
-    const domHtml = l.dom === null ? '<span class="muted">—</span>' : l.dom > 90 ? `<span class="red">${l.dom}</span>` : l.dom > 45 ? `<span class="amber">${l.dom}</span>` : l.dom;
+    const domHtml  = l.webDom === null ? '<span class="muted">—</span>' : l.webDom > 90 ? `<span class="red">${l.webDom}</span>` : l.webDom > 45 ? `<span class="amber">${l.webDom}</span>` : l.webDom;
+    const zdomHtml = l.dom    === null ? '<span class="muted">—</span>' : l.dom    > 90 ? `<span class="red">${l.dom}</span>`    : l.dom    > 45 ? `<span class="amber">${l.dom}</span>`    : l.dom;
     const expHtml = l.expiry === null ? '—' : l.expiry < 0 ? '<span class="red">Expired</span>' : l.expiry > 3650 ? '<span class="muted">None</span>' : l.expiry < 15 ? `<span class="red">${l.expiry}d</span>` : l.expiry < 30 ? `<span class="amber">${l.expiry}d</span>` : l.expiry + 'd';
     const daysSinceDrop = l.daysDrop !== null ? l.daysDrop : null;
     const ldHtml = daysSinceDrop === null ? '<span class="muted">—</span>' : daysSinceDrop > 30 ? `<span class="red">${daysSinceDrop}d</span>` : daysSinceDrop > 7 ? `<span class="amber">${daysSinceDrop}d</span>` : daysSinceDrop + 'd';
@@ -980,6 +995,7 @@ function renderPortfolio() {
       <td>${spHtml}</td>
       <td>${domHtml}</td>
       <td>${expHtml}</td>
+      <td>${zdomHtml}</td>
       <td>${zViewsHtml}</td>
       <td>${zSavesHtml}</td>
       <td>
