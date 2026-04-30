@@ -327,19 +327,19 @@
     <div class="summary-bar" id="summaryBar"></div>
     <div class="table-wrap">
       <table class="tbl">
-        <thead><tr>
-          <th class="sortable ${sortCol==='addr'?'sort-active':''}" onclick="setSort('addr')">Property<span class="sort-arrow">${sortCol==='addr'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
+        <thead id="portfolioHead"><tr>
+          <th class="sortable" onclick="setSort('addr')">Property <span class="sort-arrow">↕</span></th>
           <th>Listing ID</th>
           <th>LandID</th>
-          <th class="sortable ${sortCol==='pei'?'sort-active':''}" onclick="setSort('pei')">LEI<span class="sort-arrow">${sortCol==='pei'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
-          <th class="sortable ${sortCol==='contractP'?'sort-active':''}" onclick="setSort('contractP')">Contract price<span class="sort-arrow">${sortCol==='contractP'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
-          <th class="sortable ${sortCol==='listP'?'sort-active':''}" onclick="setSort('listP')">List price<span class="sort-arrow">${sortCol==='listP'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
-          <th class="sortable ${sortCol==='daysDrop'?'sort-active':''}" onclick="setSort('daysDrop')">Price age<span class="sort-arrow">${sortCol==='daysDrop'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
-          <th class="sortable ${sortCol==='spread'?'sort-active':''}" onclick="setSort('spread')">Spread<span class="sort-arrow">${sortCol==='spread'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
-          <th class="sortable ${sortCol==='dom'?'sort-active':''}" onclick="setSort('dom')">DOM<span class="sort-arrow">${sortCol==='dom'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
-          <th class="sortable ${sortCol==='expiry'?'sort-active':''}" onclick="setSort('expiry')">Expiry<span class="sort-arrow">${sortCol==='expiry'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
-          <th class="sortable ${sortCol==='zViews'?'sort-active':''}" onclick="setSort('zViews')">ZViews<span class="sort-arrow">${sortCol==='zViews'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
-          <th class="sortable ${sortCol==='saves'?'sort-active':''}" onclick="setSort('saves')">ZSaves<span class="sort-arrow">${sortCol==='saves'?(sortDir==='asc'?'▲':'▼'):'↕'}</span></th>
+          <th class="sortable" onclick="setSort('pei')">LEI <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="setSort('contractP')">Contract price <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="setSort('listP')">List price <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="setSort('daysDrop')">Price age <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="setSort('spread')">Spread <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="setSort('dom')">DOM <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="setSort('expiry')">Expiry <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="setSort('zViews')">ZViews <span class="sort-arrow">↕</span></th>
+          <th class="sortable" onclick="setSort('saves')">ZSaves <span class="sort-arrow">↕</span></th>
           <th>Incoming</th>
           <th>Outgoing (BB/RT/IV/NG)</th>
         </tr></thead>
@@ -480,11 +480,11 @@ function parseRow(row) {
     sellerName: gv(row, 'Seller Name', 'Seller', 'Owner Name', 'Owner') || '',
     txn: gv(row, 'Transaction') || '', listingId: gv(row, 'MLS') || '', websiteId: gv(row, 'Website') || '',
     txnLink: gv(row, 'Transaction Link', 'transaction link') || '',
-    marketHubLink: gv(row, 'Property Link', 'property link', 'Market Hub Link', 'The Market Hub Link') || '',
+    marketHubLink: gv(row, 'The Market Hub Link', 'Property Link', 'property link', 'Market Hub Link') || '',
     ppp: gv(row, 'PPP: PPP Name') || '', cpi: gv(row, 'CPI') || '', lds: n(gv(row, 'LDS')),
     listP, contractP, spread: listP !== null ? listP - contractP : null,
     lastListP: n(gv(row, 'Last Cash List Price')), profit: n(gv(row, 'Potential Profit')),
-    equity: n(gv(row, 'Equity Capture')), pricePct: parseFloat(gv(row, 'Price Drop %')) || 0,
+    equity: n(gv(row, 'Equity Capture')), pricePct: (() => { const v = gv(row, 'Price Drop %'); if (!v) return 0; const s = v.toString().replace('%','').trim(); return parseFloat(s) / (s.includes('.') && parseFloat(s) < 1 ? 1 : 100) || 0; })(),
     saves: n(gv(row, 'Zillow Saves')), zViews: n(gv(row, 'Zillow Views', 'ZViews', 'Zillow_Views')), mlsSaves: n(gv(row, 'MLS Saves')),
     zillowLink: gv(row, 'Zillow Link', 'Zillow URL', 'zillow link') || '',
     dom: n(gv(row, 'MLS DOM')), webDom: n(gv(row, 'Website DOM')),
@@ -1777,6 +1777,16 @@ function fpei(val, btn) {
 function setSort(col) {
   if (sortCol === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
   else { sortCol = col; sortDir = 'asc'; }
+  // Update header visuals
+  const head = document.getElementById('portfolioHead');
+  if (head) {
+    head.querySelectorAll('th.sortable').forEach(th => {
+      const thCol = th.getAttribute('onclick').match(/setSort\('(.+?)'\)/)?.[1];
+      const arrow = th.querySelector('.sort-arrow');
+      th.classList.toggle('sort-active', thCol === sortCol);
+      if (arrow) arrow.textContent = thCol === sortCol ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ↕';
+    });
+  }
   closeCard(); renderPortfolio();
 }
 
