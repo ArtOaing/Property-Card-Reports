@@ -1444,7 +1444,7 @@ function showCard(id) {
           </div>
           <div class="mc">
             <div class="mc-l">Pricing option</div>
-            <div class="mc-v" style="font-size:13px;color:${pdf.pricingOption === 'With Seller Financing' ? 'var(--teal-text)' : 'var(--text)'}">${pdf.pricingOption === 'With Seller Financing' ? 'Seller Finance' : 'Cash Only'}</div>
+            <div class="mc-v" style="font-size:13px;color:${pdf.pricingOption === 'With Seller Financing' ? 'var(--teal-text)' : 'var(--text)'}">${pdf.pricingOption || 'Cash Only'}</div>
             <div class="mc-s">${pdf.pricingOption === 'With Seller Financing' ? 'SF active' : 'No SF'}</div>
           </div>
           <div class="mc">
@@ -1459,7 +1459,7 @@ function showCard(id) {
           </div>
           <div class="mc">
             <div class="mc-l">Last drop date</div>
-            <div class="mc-v" style="font-size:13px">${lastDropDate ? fmtDate(lastDropDate) : '—'}</div>
+            <div class="mc-v" style="font-size:13px">${lastDropDate ? (() => { const d = new Date(lastDropDate); return isNaN(d) ? lastDropDate : (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getDate().toString().padStart(2,'0') + '/' + d.getFullYear(); })() : '—'}</div>
             <div class="mc-s">${lastDropDate ? Math.round((new Date() - new Date(lastDropDate)) / 86400000) + 'd ago' : '—'}</div>
           </div>
           <div class="mc">
@@ -1494,7 +1494,7 @@ function showCard(id) {
             </div>
             <div class="mc" style="border:1px solid var(--teal-bg)">
               <div class="mc-l">Interest rate</div>
-              <div class="mc-v" style="font-size:15px;color:var(--teal-text)">${pdf.sfInterest || '—'}</div>
+              <div class="mc-v" style="font-size:15px;color:var(--teal-text)">${pdf.sfInterest ? (String(pdf.sfInterest).includes('%') ? pdf.sfInterest : pdf.sfInterest + '%') : '—'}</div>
               <div class="mc-s">Annual rate</div>
             </div>
             <div class="mc" style="border:1px solid var(--teal-bg)">
