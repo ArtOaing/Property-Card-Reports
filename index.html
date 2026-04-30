@@ -537,7 +537,7 @@ function enrichListingsFromPriceDrop() {
     }
     if (l.origPrice && l.listP) l.pricePct = (l.origPrice - l.listP) / l.origPrice;
     l.spread = l.listP !== null ? l.listP - l.contractP : null;
-    l.pricingOption = pd['Current Pricing Option'] || 'Cash Only';
+    l.pricingOption = pd['Current Pricing Option'] || pd['Current'] || 'Cash Only';
     l.sfPrice = n(pd['Current Seller Financing Price']) || null;
     l.sfDownPayment = n(pd['Current Downpayment']) || null;
     l.sfLoanAmount = n(pd['Current Loan Amount']) || null;
