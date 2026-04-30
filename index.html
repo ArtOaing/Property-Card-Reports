@@ -610,44 +610,46 @@ function parsePriceDropHistory(pd) {
   const drops = [];
   const n = v => (v !== null && v !== undefined && v !== '' && !isNaN(parseFloat(v))) ? parseFloat(v) : null;
 
-  // Helper — case-insensitive trimmed key lookup
-  const get = (obj, key) => {
-    const kl = key.toLowerCase().trim();
-    for (const k of Object.keys(obj)) {
-      if (k.toLowerCase().trim() === kl && obj[k] !== null && obj[k] !== undefined && obj[k] !== '') return obj[k];
+  // Helper — case-insensitive trimmed key lookup, accepts multiple key variants
+  const get = (obj, ...keys) => {
+    for (const key of keys) {
+      const kl = key.toLowerCase().trim();
+      for (const k of Object.keys(obj)) {
+        if (k.toLowerCase().trim() === kl && obj[k] !== null && obj[k] !== undefined && obj[k] !== '') return obj[k];
+      }
     }
     return null;
   };
 
   // Original price
-  if (n(get(pd, 'Original Cash Price'))) {
-    drops.push({ date: null, price: n(get(pd, 'Original Cash Price')), label: 'Original' });
+  if (n(get(pd, 'Original Cash Price', 'Original Price'))) {
+    drops.push({ date: null, price: n(get(pd, 'Original Cash Price', 'Original Price')), label: 'Original' });
   }
 
-  // PD 1 — field name has no number suffix
-  if (n(get(pd, 'PD 1 Cash Price')) && get(pd, 'Proposed Price Drop Date')) {
-    drops.push({ date: get(pd, 'Proposed Price Drop Date'), price: n(get(pd, 'PD 1 Cash Price')), label: 'Drop 1' });
+  // PD 1 — date field has no number suffix
+  const pd1Price = n(get(pd, 'PD 1 Cash Price', 'PD1 Cash Price'));
+  const pd1Date = get(pd, 'Proposed Price Drop Date', 'Proposed Price Drop Date 1', 'PD 1 Date');
+  if (pd1Price) {
+    drops.push({ date: pd1Date || null, price: pd1Price, label: 'Drop 1' });
   }
 
-  // PD 2–5
+  // PD 2–5 — keep drops even when date is missing (will be interpolated at render time)
   for (let i = 2; i <= 5; i++) {
-    const price = n(get(pd, `PD ${i} Cash Price`));
-    const date = get(pd, `Proposed Price Drop Date ${i}`);
-    if (price && date) {
-      drops.push({ date, price, label: `Drop ${i}` });
+    const price = n(get(pd, `PD ${i} Cash Price`, `PD${i} Cash Price`));
+    const date = get(pd, `Proposed Price Drop Date ${i}`, `Proposed Price Drop Date${i}`, `PD ${i} Date`);
+    if (price) {
+      drops.push({ date: date || null, price, label: `Drop ${i}` });
     }
   }
 
   // Final drop
-  const finalPrice = n(get(pd, 'Final PD Cash Price'));
-  const finalDate = get(pd, 'Proposed Final Price Drop Date');
-  if (finalPrice && finalDate) {
-    drops.push({ date: finalDate, price: finalPrice, label: 'Final' });
+  const finalPrice = n(get(pd, 'Final PD Cash Price', 'Final Cash Price'));
+  const finalDate = get(pd, 'Proposed Final Price Drop Date', 'Final PD Date');
+  if (finalPrice) {
+    drops.push({ date: finalDate || null, price: finalPrice, label: 'Final' });
   }
 
-  const result = drops;
-  console.log('[PD History]', pd['Listing #'] || '?', result.map(d => d.label + ':' + d.price + ':' + d.date));
-  return result;
+  return drops;
 }
 
 function getCamps(id) { return camps.filter(r => (gv(r,'SH ID','sh id') || '').toString().trim() === id.toString().trim()); }
@@ -1221,25 +1223,59 @@ function showCard(id) {
           const todayPct = pct(today.getTime());
           const listPct = listDate ? pct(listDate.getTime()) : null;
 
-          // Real price drop dots from price drop report
-          console.log('[Timeline] pdHistory for', l.mainListing, pdHistory);
+          // Price drop dots — including drops with missing dates (interpolated)
           const origPriceEntry = pdHistory.find(d => d.label === 'Original');
-          const realDrops = pdHistory
-            .filter(d => d.date && d.label !== 'Original')
-            .map(d => ({ date: new Date(d.date), price: d.price, label: d.label }))
-            .filter(d => !isNaN(d.date.getTime()))
-            .sort((a, b) => a.date - b.date);
+          const dropEntries = pdHistory.filter(d => d.label !== 'Original');
 
-          // Build milestones — fixed alternating above/below
+          // Build dated drops — interpolate any missing dates between known ones
+          const realDrops = (() => {
+            // Pass 1: parse explicit dates
+            const parsed = dropEntries.map(d => {
+              const dt = d.date ? new Date(d.date) : null;
+              return { label: d.label, price: d.price, date: dt && !isNaN(dt.getTime()) ? dt : null, estimated: false };
+            });
+            // Pass 2: fill missing dates by interpolating between known anchors
+            const fallbackStart = listDate || contractDate;
+            for (let i = 0; i < parsed.length; i++) {
+              if (parsed[i].date) continue;
+              let prevIdx = -1, nextIdx = -1;
+              for (let j = i - 1; j >= 0; j--) if (parsed[j].date) { prevIdx = j; break; }
+              for (let j = i + 1; j < parsed.length; j++) if (parsed[j].date) { nextIdx = j; break; }
+              const prevTime = prevIdx >= 0 ? parsed[prevIdx].date.getTime() : fallbackStart.getTime();
+              const nextTime = nextIdx >= 0 ? parsed[nextIdx].date.getTime() : today.getTime();
+              const slots = (nextIdx >= 0 ? nextIdx : parsed.length) - prevIdx;
+              const offset = i - prevIdx;
+              parsed[i].date = new Date(prevTime + (nextTime - prevTime) * (offset / slots));
+              parsed[i].estimated = true;
+            }
+            return parsed.filter(p => p.date && !isNaN(p.date.getTime()))
+              .sort((a, b) => a.date - b.date);
+          })();
+
+          // Original price as its own milestone — placed at listing date (or contract date as fallback)
+          const origAnchor = origPriceEntry ? (listDate || contractDate) : null;
+          const origMilestone = origAnchor ? {
+            pct: pct(origAnchor.getTime()),
+            color: 'var(--blue-border)',
+            label: fmt(origPriceEntry.price),
+            sublabel: 'Original',
+            date: fmtShort(origAnchor),
+            above: true,
+            isOriginal: true
+          } : null;
+
+          // Build milestones — alternate above/below for drops to avoid label collisions
+          const dropOffset = (origMilestone || listPct !== null) ? 1 : 0;
           const milestones = [
-            { pct: 0, color: 'var(--green-border)', label: origPriceEntry ? fmt(origPriceEntry.price) : 'Contracted', date: fmtShort(contractDate), above: false },
-            ...(listPct !== null ? [{ pct: listPct, color: 'var(--blue-border)', label: 'Listed', date: fmtShort(listDate), above: true }] : []),
+            { pct: 0, color: 'var(--green-border)', label: 'Contracted', date: fmtShort(contractDate), above: false },
+            ...(origMilestone ? [origMilestone] : (listPct !== null ? [{ pct: listPct, color: 'var(--blue-border)', label: 'Listed', date: fmtShort(listDate), above: true }] : [])),
             ...realDrops.map((d, i) => ({
               pct: pct(d.date.getTime()),
               color: 'var(--amber-border)',
               label: fmt(d.price),
+              sublabel: d.label + (d.estimated ? ' (est)' : ''),
               date: fmtShort(d.date),
-              above: (i + (listPct !== null ? 1 : 0)) % 2 === 0,
+              above: (i + dropOffset) % 2 === 0,
               isPriceDrop: true
             })),
             { pct: todayPct, color: barColor, label: 'Today', date: fmtShort(today), above: true, isToday: true },
@@ -1253,23 +1289,26 @@ function showCard(id) {
             <div style="position:absolute;left:${m.pct}%;top:50%;transform:translate(-50%,-50%);z-index:2">
               ${m.isToday
                 ? `<div style="width:14px;height:14px;border-radius:50%;background:var(--bg);border:3px solid ${m.color};box-shadow:0 0 0 3px ${m.color}22"></div>`
-                : m.isPriceDrop
-                  ? `<div style="width:10px;height:10px;border-radius:50%;background:var(--amber-border);border:2px solid var(--bg)"></div>`
-                  : `<div style="width:12px;height:12px;border-radius:50%;background:${m.color};border:2px solid var(--bg)"></div>`}
+                : m.isOriginal
+                  ? `<div style="width:11px;height:11px;border-radius:50%;background:var(--blue-border);border:2px solid var(--bg)"></div>`
+                  : m.isPriceDrop
+                    ? `<div style="width:10px;height:10px;border-radius:50%;background:var(--amber-border);border:2px solid var(--bg)"></div>`
+                    : `<div style="width:12px;height:12px;border-radius:50%;background:${m.color};border:2px solid var(--bg)"></div>`}
               <div style="position:absolute;${m.above ? 'bottom:' + ABOVE_TOP + 'px' : 'top:' + BELOW_TOP + 'px'};${m.isEnd ? 'right:0;text-align:right' : 'left:50%;transform:translateX(-50%);text-align:center'};white-space:nowrap;line-height:1.5">
-                <div style="font-size:9px;font-weight:${m.isToday ? '700' : '600'};color:${m.isToday ? m.color : m.isPriceDrop ? 'var(--amber-text)' : 'var(--text3)'};text-transform:uppercase;letter-spacing:0.04em">${m.label}</div>
+                <div style="font-size:9px;font-weight:${m.isToday ? '700' : '600'};color:${m.isToday ? m.color : m.isOriginal ? 'var(--blue-text)' : m.isPriceDrop ? 'var(--amber-text)' : 'var(--text3)'};text-transform:uppercase;letter-spacing:0.04em">${m.label}</div>
+                ${m.sublabel ? `<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;margin-top:1px">${m.sublabel}</div>` : ''}
                 <div style="font-size:10px;color:${m.label === 'Expires' && daysLeft < 15 ? 'var(--red-text)' : 'var(--text2)'}">${m.date}</div>
               </div>
             </div>`;
 
           return `
-            <div style="position:relative;height:100px;margin:0 8px">
+            <div style="position:relative;height:120px;margin:0 8px">
               <div style="position:absolute;top:50%;left:0;right:0;height:4px;background:var(--bg3);border-radius:2px;transform:translateY(-50%)">
                 <div style="position:absolute;left:0;top:0;height:100%;width:${todayPct}%;background:${barColor};border-radius:2px"></div>
                 ${milestones.map(dotHtml).join('')}
               </div>
             </div>
-            ${realDrops.length > 0 ? '' : pdOk ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;text-align:center">No price drop dates in report for this listing</div>' : ''}`;
+            ${realDrops.some(d => d.estimated) ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;text-align:center;font-style:italic">Some drop dates missing in price drop report — positions estimated</div>' : ''}`;
         })()}
       </div>
 
