@@ -331,7 +331,7 @@
       <table class="tbl">
         <thead id="portfolioHead"><tr>
           <th class="sortable" onclick="setSort('addr')">Property <span class="sort-arrow">↕</span></th>
-          <th>Listing ID</th>
+          <th class="sortable" onclick="setSort('listing')">Listing ID <span class="sort-arrow">↕</span></th>
           <th>LandID</th>
           <th class="sortable" onclick="setSort('pei')">LEI <span class="sort-arrow">↕</span></th>
           <th class="sortable" onclick="setSort('contractP')">Contract price <span class="sort-arrow">↕</span></th>
@@ -816,6 +816,7 @@ function renderPortfolio() {
       switch(sortCol) {
         case 'expiry': { const e = a === l ? (a.expiry === null ? 9999 : a.expiry < 0 ? -9999 : a.expiry) : (b.expiry === null ? 9999 : b.expiry < 0 ? -9999 : b.expiry); return e; }
         case 'addr': return (l.addr || '').toLowerCase();
+        case 'listing': return (l.mainListing || '').toLowerCase();
         case 'pei': return calcExposure(l, lc2, ol2);
         case 'contractP': return l.contractP || 0;
         case 'listP': return l.listP || 0;
@@ -1021,7 +1022,7 @@ function showCard(id) {
           <td>${fmtDate(date)}</td>
           <td style="text-align:center;color:var(--text3)">${members ? members.toLocaleString() : '—'}</td>
           <td style="text-align:center">${mkBtn(leads.sourced||0, sourcedLeads, 's')}</td>
-          <td style="text-align:center">${mkBtn(leads.appt||0, apptLeads, 'a')}${leads.apptSched ? `<div style="font-size:9px;color:var(--blue-text);font-weight:500">${leads.apptSched}</div>` : ''}</td>
+          <td style="text-align:center">${mkBtn(leads.appt||0, apptLeads, 'a')}</td>
           <td style="text-align:center">${mkBtn(leads.qual||0, qualLeads, 'q')}</td>
           <td style="text-align:center;font-weight:${(leads.contractSent||0)>0?'600':'400'};color:${(leads.contractSent||0)>0?'var(--text)':'var(--text3)'}">${leads.contractSent||0}</td>
           <td style="text-align:center">${mkBtn(leads.emd||0, emdLeads, 'e')}</td>
