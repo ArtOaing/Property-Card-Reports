@@ -488,7 +488,7 @@ function parseRow(row) {
     txnLink: gv(row, 'Transaction Link', 'transaction link') || '',
     marketHubLink: gv(row, 'The Market Hub Link', 'Property Link', 'property link', 'Market Hub Link') || '',
     ppp: gv(row, 'PPP: PPP Name') || '', cpi: gv(row, 'CPI') || '', lds: n(gv(row, 'LDS')),
-    listP, contractP, spread: listP !== null ? listP - contractP : null,
+    listP, contractP,
     lastListP: n(gv(row, 'Last Cash List Price')), profit: n(gv(row, 'Potential Profit')),
     equity: n(gv(row, 'Equity Capture')), pricePct: (() => { const v = gv(row, 'Price Drop %'); if (!v) return 0; const s = v.toString().replace('%','').trim(); return parseFloat(s) / (s.includes('.') && parseFloat(s) < 1 ? 1 : 100) || 0; })(),
     saves: n(gv(row, 'Zillow Saves')), zViews: n(gv(row, 'Zillow Views', 'ZViews', 'Zillow_Views')), mlsSaves: n(gv(row, 'MLS Saves')),
@@ -545,7 +545,6 @@ function enrichListingsFromPriceDrop() {
       if (!isNaN(d)) l.daysDrop = Math.round((new Date() - d) / 86400000);
     }
     if (l.origPrice && l.listP) l.pricePct = (l.origPrice - l.listP) / l.origPrice;
-    l.spread = l.listP !== null ? l.listP - l.contractP : null;
     l.pricingOption = pd['Current Pricing Option'] || pd['Current'] || 'Cash Only';
     l.sfPrice = n(pd['Current Seller Financing Price']) || null;
     l.sfDownPayment = n(pd['Current Downpayment']) || null;
@@ -720,7 +719,8 @@ function aggregateInboundLeads(leads) {
     const lead = {
       name: [r['First Name'], r['Last Name']].map(s => (s || '').trim()).filter(Boolean).join(' ') || '—',
       status: (r['Lead Status'] || '—').toString().trim(),
-      source: src
+      source: src,
+      apptSched: (r['Appointment Sched'] || '').toString().trim()
     };
     map[src].total++;
     if (cats.sourced) { map[src].sourced++; map[src].sourcedLeads.push(lead); }
@@ -917,7 +917,7 @@ function renderPortfolio() {
         case 'contractP': return l.contractP || 0;
         case 'listP': return l.listP || 0;
         case 'daysDrop': return l.daysDrop !== null ? l.daysDrop : 9999;
-        case 'spread': return (l.listP || 0) - (l.contractP || 0);
+        case 'spread': return l.profit !== null && l.profit !== undefined ? l.profit : -Infinity;
         case 'dom': return l.dom !== null ? l.dom : 9999;
         case 'zViews': return l.zViews !== null ? l.zViews : -1;
         case 'saves': return l.saves !== null ? l.saves : -1;
@@ -957,7 +957,7 @@ function renderPortfolio() {
     const lc = getCamps(l.id);
     const pei = calcExposure(l, lc, l.mainListing ? getOutboundLeads(l.mainListing) : []);
     const peiColor = pei >= 90 ? 'sr-g' : pei >= 50 ? 'sr-a' : 'sr-r';
-    const sp = l.listP !== null ? l.listP - l.contractP : null;
+    const sp = l.profit !== null && l.profit !== undefined ? l.profit : null;
     const spHtml = sp === null ? '—' : sp < 0 ? `<span class="red">${fmt(sp)}</span>` : sp < 10000 ? `<span class="amber">${fmt(sp)}</span>` : fmt(sp);
     const zViewsHtml = l.zViews === null ? '<span class="muted">—</span>' : `${l.zViews.toLocaleString()}`;
     const zSavesHtml = l.saves === null ? '<span class="muted">—</span>' : l.saves === 0 ? '<span class="red">0</span>' : l.saves < 10 ? `<span class="amber">${l.saves}</span>` : `<span class="green">${l.saves}</span>`;
@@ -1797,12 +1797,14 @@ function showCard(id) {
                       <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Name</th>
                       <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Status</th>
                       <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Source</th>
+                      <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Appt scheduled</th>
                     </tr></thead>
                     <tbody>
                       ${leadList.map((r, i) => `<tr style="border-top:0.5px solid var(--border);${i%2===1?'background:var(--bg3)':''}">
                         <td style="padding:8px 14px;font-weight:600;color:var(--text)">${r.name}</td>
                         <td style="padding:8px 14px;color:var(--text2)">${r.status}</td>
                         <td style="padding:8px 14px;color:var(--text3)">${r.source}</td>
+                        <td style="padding:8px 14px;color:${r.apptSched ? 'var(--blue-text)' : 'var(--text3)'};font-weight:${r.apptSched ? '500' : '400'}">${r.apptSched || '—'}</td>
                       </tr>`).join('')}
                     </tbody>
                   </table>
