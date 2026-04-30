@@ -537,6 +537,12 @@ function enrichListingsFromPriceDrop() {
     }
     if (l.origPrice && l.listP) l.pricePct = (l.origPrice - l.listP) / l.origPrice;
     l.spread = l.listP !== null ? l.listP - l.contractP : null;
+    l.pricingOption = pd['Current Pricing Option'] || 'Cash Only';
+    l.sfPrice = n(pd['Current Seller Financing Price']) || null;
+    l.sfDownPayment = n(pd['Current Downpayment']) || null;
+    l.sfLoanAmount = n(pd['Current Loan Amount']) || null;
+    l.sfInterest = pd['Current Interest %'] || null;
+    l.sfMonthly = n(pd['Current Monthly Payments']) || null;
   });
 }
 
@@ -577,7 +583,6 @@ function enrichListingsFromCampaigns() {
 }
 
 function getPdFields(l) {
-  // l is already enriched by enrichListingsFromPriceDrop — just return its current values
   return {
     listP: l.listP,
     lastListP: l.lastListP,
@@ -586,7 +591,13 @@ function getPdFields(l) {
     origPrice: l.origPrice || null,
     pricePct: l.pricePct,
     profit: l.profit,
-    contractP: l.contractP
+    contractP: l.contractP,
+    pricingOption: l.pricingOption || 'Cash Only',
+    sfPrice: l.sfPrice || null,
+    sfDownPayment: l.sfDownPayment || null,
+    sfLoanAmount: l.sfLoanAmount || null,
+    sfInterest: l.sfInterest || null,
+    sfMonthly: l.sfMonthly || null
   };
 }
 
@@ -1420,7 +1431,7 @@ function showCard(id) {
       <!-- DEAL ECONOMICS -->
       <div class="sec">
         <div class="sec-title">Deal economics</div>
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">
+        <div style="display:grid;grid-template-columns:repeat(${pdf.pricingOption === 'With Seller Financing' ? '13' : '8'},1fr);gap:8px">
           <div class="mc">
             <div class="mc-l">Contract price</div>
             <div class="mc-v">${fmt(pdf.contractP)}</div>
@@ -1436,6 +1447,37 @@ function showCard(id) {
             <div class="mc-v">${fmt(listPrice)}</div>
             <div class="mc-s">${dropCount} drop${dropCount !== 1 ? 's' : ''}</div>
           </div>
+          <div class="mc">
+            <div class="mc-l">Pricing option</div>
+            <div class="mc-v" style="font-size:13px;color:${pdf.pricingOption === 'With Seller Financing' ? 'var(--teal-text)' : 'var(--text)'}">${pdf.pricingOption === 'With Seller Financing' ? 'Seller Finance' : 'Cash Only'}</div>
+            <div class="mc-s">${pdf.pricingOption === 'With Seller Financing' ? 'SF active' : 'No SF'}</div>
+          </div>
+          ${pdf.pricingOption === 'With Seller Financing' ? `
+          <div class="mc">
+            <div class="mc-l">SF price</div>
+            <div class="mc-v" style="color:var(--teal-text)">${pdf.sfPrice ? fmt(pdf.sfPrice) : '—'}</div>
+            <div class="mc-s">Seller financing</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Down payment</div>
+            <div class="mc-v" style="color:var(--teal-text)">${pdf.sfDownPayment ? fmt(pdf.sfDownPayment) : '—'}</div>
+            <div class="mc-s">Required down</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Loan amount</div>
+            <div class="mc-v" style="color:var(--teal-text)">${pdf.sfLoanAmount ? fmt(pdf.sfLoanAmount) : '—'}</div>
+            <div class="mc-s">Balance financed</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Interest rate</div>
+            <div class="mc-v" style="font-size:15px;color:var(--teal-text)">${pdf.sfInterest ? pdf.sfInterest : '—'}</div>
+            <div class="mc-s">Annual rate</div>
+          </div>
+          <div class="mc">
+            <div class="mc-l">Monthly payment</div>
+            <div class="mc-v" style="color:var(--teal-text)">${pdf.sfMonthly ? fmt(pdf.sfMonthly) : '—'}</div>
+            <div class="mc-s">Per month</div>
+          </div>` : ''}
           <div class="mc">
             <div class="mc-l">Last list price</div>
             <div class="mc-v">${fmt(lastListPrice)}</div>
