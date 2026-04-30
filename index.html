@@ -254,6 +254,7 @@
         <div class="loader-dot" id="dot-pd"><div class="dot"></div><span>Price drops</span></div>
         <div class="loader-dot" id="dot-camp"><div class="dot"></div><span>Campaigns</span></div>
         <div class="loader-dot" id="dot-dispo"><div class="dot"></div><span>Dispo</span></div>
+        <div class="loader-dot" id="dot-ib"><div class="dot"></div><span>Inbound</span></div>
         <div class="loader-dot" id="dot-zillow"><div class="dot"></div><span>Zillow</span></div>
       </div>
       <div id="lastRefreshed" style="font-size:10px;color:var(--text3)"></div>
@@ -361,8 +362,8 @@
 
 <script>
 // ── STATE ──────────────────────────────────────────────────────────────────
-let listings = [], camps = [], fbacks = [], outboundLeads = [], priceDropData = [], zillowData = [], dispoData = [];
-let sfOk = false, campOk = false, pdOk = false, zillowOk = false, dispoOk = false;
+let listings = [], camps = [], fbacks = [], outboundLeads = [], priceDropData = [], zillowData = [], dispoData = [], inboundLeads = [];
+let sfOk = false, campOk = false, pdOk = false, zillowOk = false, dispoOk = false, ibOk = false;
 let podFilter = 'all', stageFilter = [], expiryFilter = 'all', stateFilter = [], titleFilter = [], peiFilter = 'all', dropsFilter = 'all', dropAgeFilter = 'all';
 let priceStaleFilter = false, noMlsFilter = false;
 let sortCol = 'expiry', sortDir = 'asc';
@@ -376,7 +377,8 @@ const SOURCES = {
   pd:     BASE + 'price-drop-report.csv',
   camp:   BASE + 'outbound-campaigns-leads.csv',
   zillow: BASE + 'zillow-reports.csv',
-  dispo:  BASE + 'dispo-campaigns'
+  dispo:  BASE + 'dispo-campaigns',
+  ib:     BASE + 'inbound-leads.csv'
 };
 
 function setDot(id, state) {
@@ -425,8 +427,8 @@ async function loadFromSheets() {
   btn.disabled = true;
   btn.textContent = '⟳ Loading...';
 
-  const [sfRows, pdRows, campRows, zillowRows, dispoRows] = await Promise.all([
-    fetchCSV('sf'), fetchCSV('pd'), fetchCSV('camp'), fetchCSV('zillow'), fetchCSV('dispo')
+  const [sfRows, pdRows, campRows, zillowRows, dispoRows, ibRows] = await Promise.all([
+    fetchCSV('sf'), fetchCSV('pd'), fetchCSV('camp'), fetchCSV('zillow'), fetchCSV('dispo'), fetchCSV('ib')
   ]);
 
   if (sfRows.length > 0) { listings = sfRows.map(parseRow).filter(Boolean); sfOk = true; }
@@ -434,6 +436,7 @@ async function loadFromSheets() {
   if (campRows.length > 0) { outboundLeads = campRows.filter(r => r['The Market Hub #']); campOk = true; }
   if (zillowRows.length > 0) { zillowData = zillowRows.filter(r => r['Listing #']); zillowOk = true; }
   if (dispoRows.length > 0) { dispoData = dispoRows.filter(r => r['The Market Hub #'] || r['Listing #']); dispoOk = true; }
+  if (ibRows.length > 0) { inboundLeads = ibRows.filter(r => r['The Market Hub']); ibOk = true; }
 
   if (sfOk) {
     enrichListingsWithPriceData();
@@ -673,6 +676,71 @@ function getOutboundLeads(mainListing) {
     const mh = (gv(r, 'The Market Hub #', 'Market Hub') || '').toString().trim();
     return mh === mainListing.toString().trim();
   });
+}
+
+function getInboundLeads(mainListing) {
+  return inboundLeads.filter(r => {
+    const mh = (r['The Market Hub'] || '').toString().trim();
+    return mh === mainListing.toString().trim();
+  });
+}
+
+// Cumulative funnel categorization — a "Qualified" lead also counts as Sourced + Appt
+function categorizeInboundStatus(status) {
+  const s = (status || '').toString().toLowerCase().trim();
+  const cats = { sourced: false, appt: false, qual: false, noEmd: false, emd: false };
+  // Decide the deepest stage reached, then mark all stages up to and including it
+  let stage = 0; // 0=none, 1=sourced, 2=appt, 3=qual, 4=noEmd, 5=emd
+  if (s.includes('buyer won')) stage = 5;
+  else if (s.includes('contract signed') && s.includes('w/o emd')) stage = 4;
+  else if (s.includes('contract signed') && !s.includes('w/o')) stage = 5; // contract signed (assume w/ EMD)
+  else if (s.includes('obj handling') || s.includes('price neg') || s.includes('negotiat')) stage = 3;
+  else if (s.includes('qualified')) stage = 3;
+  else if (s.includes('appointment') || s.includes('appt')) stage = 2;
+  else if (s.includes("buyer's list") || s.includes('buyers list') || s.includes('lead') || s.includes('sourced')) stage = 1;
+  else if (s) stage = 1; // unknown but non-empty status → treat as sourced
+  if (stage >= 1) cats.sourced = true;
+  if (stage >= 2) cats.appt = true;
+  if (stage >= 3) cats.qual = true;
+  if (stage >= 4) cats.noEmd = true;
+  if (stage >= 5) cats.emd = true;
+  return cats;
+}
+
+function aggregateInboundLeads(leads) {
+  const map = {};
+  leads.forEach(r => {
+    const src = (r['Lead Source'] || '').toString().trim() || 'Unknown';
+    if (!map[src]) map[src] = {
+      source: src, total: 0,
+      sourced: 0, appt: 0, qual: 0, noEmd: 0, emd: 0,
+      sourcedLeads: [], apptLeads: [], qualLeads: [], noEmdLeads: [], emdLeads: []
+    };
+    const cats = categorizeInboundStatus(r['Lead Status']);
+    const lead = {
+      name: [r['First Name'], r['Last Name']].map(s => (s || '').trim()).filter(Boolean).join(' ') || '—',
+      status: (r['Lead Status'] || '—').toString().trim(),
+      source: src
+    };
+    map[src].total++;
+    if (cats.sourced) { map[src].sourced++; map[src].sourcedLeads.push(lead); }
+    if (cats.appt)    { map[src].appt++;    map[src].apptLeads.push(lead); }
+    if (cats.qual)    { map[src].qual++;    map[src].qualLeads.push(lead); }
+    if (cats.noEmd)   { map[src].noEmd++;   map[src].noEmdLeads.push(lead); }
+    if (cats.emd)     { map[src].emd++;     map[src].emdLeads.push(lead); }
+  });
+  return Object.values(map).sort((a, b) => b.total - a.total);
+}
+
+function inboundBadgeClass(src) {
+  const s = (src || '').toLowerCase();
+  if (s === 'mls') return 'b-bl';
+  if (s.includes('fb')) return 'b-p';
+  if (s.includes('website') || s.includes('maxacres')) return 'b-teal';
+  if (s.includes('sign')) return 'b-a';
+  if (s.includes('referral')) return 'b-g';
+  if (s.includes('land')) return 'b-bl';
+  return 'b-gr';
 }
 
 function getDispoCampaigns(mainListing) {
@@ -1679,56 +1747,102 @@ function showCard(id) {
       <!-- INBOUND -->
       <div class="sec">
         ${(() => {
-          const channels = [
-            { label: 'MLS', data: l.inMls, listed: l.mls, sub: l.dom !== null ? l.dom + 'd DOM' : null, badge: 'b-bl' },
-            { label: 'Facebook Marketplace', data: l.inFb, listed: l.fb, sub: null, badge: 'b-p' },
-            { label: 'MaxAcres.com', data: l.inWeb, listed: false, sub: null, badge: 'b-teal' },
-            { label: 'Sign Board', data: l.inSign, listed: l.signBoards, sub: null, badge: 'b-a' },
-            { label: 'Realtor Campaign', data: l.inRealtor, listed: false, sub: null, badge: 'b-bl' },
-            { label: 'Investor Base', data: l.inInvestor, listed: false, sub: null, badge: 'b-teal' },
-            { label: 'Buyer Base', data: l.inBuyer, listed: false, sub: null, badge: 'b-p' },
-            { label: 'Neighbor', data: l.inNeighbor, listed: l.neighbor, sub: null, badge: 'b-a' },
-          ];
-          const totalInbound = channels.reduce((s, c) => s + (c.data ? c.data.sourced : 0), 0);
-          const hasData = channels.some(c => c.data && c.data.sourced > 0);
+          const ibLeads = l.mainListing ? getInboundLeads(l.mainListing) : [];
+          const channels = aggregateInboundLeads(ibLeads);
+          const totalInbound = channels.reduce((s, c) => s + c.sourced, 0);
 
-          const pills = channels.map(c => {
-            const hasLeads = c.data && c.data.sourced > 0;
+          // Pills row — listing-level channel toggles + sources observed in leads
+          const observedSources = new Set(channels.map(c => c.source));
+          const togglePills = [
+            { label: 'MLS', listed: l.mls, source: 'MLS', sub: l.dom !== null ? l.dom + 'd DOM' : null },
+            { label: 'Facebook Marketplace', listed: l.fb, source: null, match: s => s.toLowerCase().includes('fb') },
+            { label: 'MaxAcres.com', listed: true, source: 'Website', match: s => s.toLowerCase() === 'website' || s.toLowerCase().includes('maxacres') },
+            { label: 'Sign Board', listed: l.signBoards, source: 'Sign Board' },
+          ];
+          const togglePillNames = new Set();
+          const pills = togglePills.map(p => {
+            // Find a matching channel (by exact source or matcher)
+            const matched = channels.find(c => p.source ? c.source === p.source : (p.match && p.match(c.source)));
+            if (matched) togglePillNames.add(matched.source);
+            const hasLeads = matched && matched.sourced > 0;
             const bg = hasLeads ? 'var(--green-bg)' : 'var(--bg2)';
-            const color = hasLeads ? 'var(--green-text)' : c.listed ? 'var(--text2)' : 'var(--text3)';
-            const border = hasLeads ? 'var(--green-border)' : c.listed ? 'var(--border2)' : 'var(--border)';
-            const leadCount = hasLeads ? ` · ${c.data.sourced} leads` : '';
-            return `<span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;background:${bg};color:${color};border:1px solid ${border}">${c.label}${c.sub ? ' · ' + c.sub : ''}${leadCount}</span>`;
+            const color = hasLeads ? 'var(--green-text)' : p.listed ? 'var(--text2)' : 'var(--text3)';
+            const border = hasLeads ? 'var(--green-border)' : p.listed ? 'var(--border2)' : 'var(--border)';
+            const leadCount = hasLeads ? ` · ${matched.sourced} leads` : '';
+            return `<span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;background:${bg};color:${color};border:1px solid ${border}">${p.label}${p.sub ? ' · ' + p.sub : ''}${leadCount}</span>`;
+          }).join('');
+          // Extra pills for sources observed in data that aren't already covered above
+          const extraPills = channels.filter(c => !togglePillNames.has(c.source)).map(c => {
+            return `<span style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;background:var(--green-bg);color:var(--green-text);border:1px solid var(--green-border)">${c.source} · ${c.sourced} leads</span>`;
           }).join('');
 
-          const rows = hasData ? channels.filter(c => c.data && c.data.sourced > 0).map(c => `
-            <tr>
-              <td><span class="badge ${c.badge}">${c.label}</span></td>
-              <td style="text-align:center;font-weight:600">${c.data.sourced}</td>
-              <td style="text-align:center;font-weight:600">${c.data.appt}</td>
-              <td style="text-align:center;font-weight:600">${c.data.qual}</td>
-              <td style="text-align:center;font-weight:600">${c.data.noEmd}</td>
-              <td style="text-align:center;font-weight:600;color:var(--green-text)">${c.data.emd}</td>
-            </tr>`).join('') + `
+          // Build expandable rows — one per source with leads
+          const rowsHtml = channels.length > 0 ? channels.map(c => {
+            const safeBase = 'ib' + Math.abs(c.source.split('').reduce((a,ch) => ((a<<5)-a)+ch.charCodeAt(0)|0, 0)).toString(36);
+
+            const mkBtn = (val, leadList, suffix) => {
+              if (!val || val === 0) return `<span style="color:var(--text3)">0</span>`;
+              if (leadList.length === 0) return `<span style="font-weight:600">${val}</span>`;
+              const safeKey = safeBase + suffix;
+              return `<span onclick="toggleCampLeads('${safeKey}')" style="font-weight:700;color:var(--blue-text);cursor:pointer;text-decoration:underline dotted" title="Click to see leads">${val} ▾</span>`;
+            };
+
+            const mkDetail = (leadList, suffix) => {
+              if (leadList.length === 0) return '';
+              const safeKey = safeBase + suffix;
+              return `<tr id="leads_${safeKey}" style="display:none">
+                <td colspan="6" style="padding:8px 8px 12px 32px;background:var(--bg3);border-bottom:0.5px solid var(--border)">
+                  <table style="width:100%;font-size:11px;border-collapse:collapse;background:var(--bg2);border-radius:6px;overflow:hidden">
+                    <thead><tr style="background:var(--bg3)">
+                      <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Name</th>
+                      <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Status</th>
+                      <th style="padding:7px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Source</th>
+                    </tr></thead>
+                    <tbody>
+                      ${leadList.map((r, i) => `<tr style="border-top:0.5px solid var(--border);${i%2===1?'background:var(--bg3)':''}">
+                        <td style="padding:8px 14px;font-weight:600;color:var(--text)">${r.name}</td>
+                        <td style="padding:8px 14px;color:var(--text2)">${r.status}</td>
+                        <td style="padding:8px 14px;color:var(--text3)">${r.source}</td>
+                      </tr>`).join('')}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>`;
+            };
+
+            return `<tr>
+              <td><span class="badge ${inboundBadgeClass(c.source)}">${c.source}</span></td>
+              <td style="text-align:center">${mkBtn(c.sourced, c.sourcedLeads, 's')}</td>
+              <td style="text-align:center">${mkBtn(c.appt, c.apptLeads, 'a')}</td>
+              <td style="text-align:center">${mkBtn(c.qual, c.qualLeads, 'q')}</td>
+              <td style="text-align:center">${mkBtn(c.noEmd, c.noEmdLeads, 'n')}</td>
+              <td style="text-align:center;color:${c.emd > 0 ? 'var(--green-text)' : 'var(--text3)'}">${mkBtn(c.emd, c.emdLeads, 'e')}</td>
+            </tr>
+            ${mkDetail(c.sourcedLeads, 's')}
+            ${mkDetail(c.apptLeads, 'a')}
+            ${mkDetail(c.qualLeads, 'q')}
+            ${mkDetail(c.noEmdLeads, 'n')}
+            ${mkDetail(c.emdLeads, 'e')}`;
+          }).join('') + `
             <tr style="border-top:2px solid var(--border);background:var(--bg3)">
               <td style="font-weight:700;font-size:11px">TOTAL</td>
-              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+(c.data?.sourced||0),0)}</td>
-              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+(c.data?.appt||0),0)}</td>
-              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+(c.data?.qual||0),0)}</td>
-              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+(c.data?.noEmd||0),0)}</td>
-              <td style="text-align:center;font-weight:700;color:var(--green-text)">${channels.reduce((s,c) => s+(c.data?.emd||0),0)}</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.sourced,0)}</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.appt,0)}</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.qual,0)}</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.noEmd,0)}</td>
+              <td style="text-align:center;font-weight:700;color:var(--green-text)">${channels.reduce((s,c) => s+c.emd,0)}</td>
             </tr>`
-          : `<tr><td colspan="6"><div class="no-data">No inbound leads recorded yet for this listing</div></td></tr>`;
+          : `<tr><td colspan="6"><div class="no-data">${ibOk ? 'No inbound leads recorded yet for this listing' : 'Inbound leads file not loaded'}</div></td></tr>`;
 
           return `
             <div class="sec-title">Inbound${totalInbound > 0 ? ' · ' + totalInbound + ' total leads' : ''}</div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">${pills}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">${pills}${extraPills}</div>
             <div class="data-tbl-wrap">
               <table class="data-tbl">
                 <thead><tr>
                   <th>Source</th><th style="text-align:center">Sourced</th><th style="text-align:center">Appt set</th><th style="text-align:center">Qualified</th><th style="text-align:center">w/o EMD</th><th style="text-align:center">w/ EMD</th>
                 </tr></thead>
-                <tbody>${rows}</tbody>
+                <tbody>${rowsHtml}</tbody>
               </table>
             </div>`;
         })()}
