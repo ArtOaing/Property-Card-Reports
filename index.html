@@ -655,19 +655,19 @@ function getDispoCampaigns(mainListing) {
 }
 
 function aggregateCampaigns(leads) {
-  // Group by Campaign Objective + Campaign Run Date
   const map = {};
   leads.forEach(r => {
     const type = (r['Campaign Objective'] || '').trim();
     const date = r['Campaign Run Date'] || '';
     const key = type + '||' + date;
-    if (!map[key]) map[key] = { type, date, sourced: 0, appt: 0, apptSched: '', qual: 0, contractSent: 0, emd: 0 };
+    if (!map[key]) map[key] = { type, date, sourced: 0, appt: 0, apptSched: '', qual: 0, neg: 0, contractSent: 0, noEmd: 0, emd: 0 };
     map[key].sourced += parseInt(r['Sourced'] || 0);
     map[key].appt += parseInt(r['Appointment Set'] || 0);
     map[key].qual += parseInt(r['Qualified'] || 0);
+    map[key].neg += parseInt(r['Negotiation'] || 0);
     map[key].contractSent += parseInt(r['Contract Sent'] || 0);
+    map[key].noEmd += parseInt(r['UC w/o EMD'] || 0);
     map[key].emd += parseInt(r['UC w/ EMD'] || 0);
-    // Capture Appointment Sched date — take first non-empty value
     if (!map[key].apptSched && r['Appointment Sched']) map[key].apptSched = r['Appointment Sched'];
   });
   return Object.values(map).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -938,53 +938,124 @@ function showCard(id) {
 
   // Build dispo campaign rows merged with leads data
   const campRows = (() => {
-    // Sort dispo campaigns by date desc
     const dispoSorted = [...dc].sort((a, b) => new Date(b['Campaign Run Date']) - new Date(a['Campaign Run Date']));
 
+    // Build leads lookup by campaign objective + date → array of lead rows
+    const leadsMap = {};
+    const leadsDetail = {};
+    ol.forEach(r => {
+      const type = (r['Campaign Objective'] || '').trim();
+      const date = r['Campaign Run Date'] || '';
+      const key = type + '||' + date;
+      if (!leadsMap[key]) { leadsMap[key] = { sourced: 0, appt: 0, apptSched: '', qual: 0, neg: 0, contractSent: 0, noEmd: 0, emd: 0 }; leadsDetail[key] = []; }
+      leadsMap[key].sourced += parseInt(r['Sourced'] || 0);
+      leadsMap[key].appt += parseInt(r['Appointment Set'] || 0);
+      leadsMap[key].qual += parseInt(r['Qualified'] || 0);
+      leadsMap[key].neg += parseInt(r['Negotiation'] || 0);
+      leadsMap[key].contractSent += parseInt(r['Contract Sent'] || 0);
+      leadsMap[key].noEmd += parseInt(r['UC w/o EMD'] || 0);
+      leadsMap[key].emd += parseInt(r['UC w/ EMD'] || 0);
+      if (!leadsMap[key].apptSched && r['Appointment Sched']) leadsMap[key].apptSched = r['Appointment Sched'];
+      const name = [r['First Name'], r['Last Name']].filter(Boolean).join(' ') || '—';
+      const status = r['Lead Status'] || '—';
+      const source = r['Buyer Lead Source'] || '—';
+      const apptSched = r['Appointment Sched'] || '';
+      leadsDetail[key].push({ name, status, source, apptSched,
+        sourced: parseInt(r['Sourced']||0), appt: parseInt(r['Appointment Set']||0),
+        qual: parseInt(r['Qualified']||0), emd: parseInt(r['UC w/ EMD']||0) });
+    });
+
+    const makeClickable = (val, key, col) => {
+      if (!val || val === 0) return `<span style="color:var(--text3)">0</span>`;
+      const leads = (leadsDetail[key] || []).filter(r => r[col] > 0);
+      if (leads.length === 0) return `<span style="font-weight:600">${val}</span>`;
+      const safeKey = btoa(key).replace(/[^a-zA-Z0-9]/g,'').substring(0,12) + '_' + col;
+      return `<span onclick="toggleCampLeads('${safeKey}')" style="font-weight:700;color:var(--blue-text);cursor:pointer;text-decoration:underline dotted" title="Click to see leads">${val} ▾</span>
+        <tr id="leads_${safeKey}" style="display:none"><td colspan="9" style="padding:0 0 8px 24px;background:var(--bg3)">
+          <table style="width:100%;font-size:10px;border-collapse:collapse">
+            <tr style="color:var(--text3)"><td style="padding:4px 8px">Name</td><td>Status</td><td>Source</td></tr>
+            ${leads.map(r => `<tr style="border-top:0.5px solid var(--border)">
+              <td style="padding:4px 8px;font-weight:500;color:var(--text)">${r.name}</td>
+              <td style="padding:4px 8px;color:var(--text2)">${r.status}</td>
+              <td style="padding:4px 8px;color:var(--text3)">${r.source}</td>
+            </tr>`).join('')}
+          </table>
+        </td></tr>`;
+    };
+
     if (dispoSorted.length > 0) {
-      // Group leads by campaign objective + date for merging
-      const leadsMap = {};
-      ol.forEach(r => {
-        const type = (r['Campaign Objective'] || '').trim();
-        const date = r['Campaign Run Date'] || '';
-        const key = type + '||' + date;
-        if (!leadsMap[key]) leadsMap[key] = { sourced: 0, appt: 0, apptSched: '', qual: 0, contractSent: 0, emd: 0 };
-        leadsMap[key].sourced += parseInt(r['Sourced'] || 0);
-        leadsMap[key].appt += parseInt(r['Appointment Set'] || 0);
-        leadsMap[key].qual += parseInt(r['Qualified'] || 0);
-        leadsMap[key].contractSent += parseInt(r['Contract Sent'] || 0);
-        leadsMap[key].emd += parseInt(r['UC w/ EMD'] || 0);
-        if (!leadsMap[key].apptSched && r['Appointment Sched']) leadsMap[key].apptSched = r['Appointment Sched'];
+      // Only show campaigns with at least one lead activity
+      const active = dispoSorted.filter(c => {
+        const key = (c['Campaign Objective']||'').trim() + '||' + (c['Campaign Run Date']||'');
+        const leads = leadsMap[key];
+        return leads && (leads.sourced > 0 || leads.appt > 0 || leads.qual > 0 || leads.emd > 0);
+      });
+      const inactive = dispoSorted.filter(c => {
+        const key = (c['Campaign Objective']||'').trim() + '||' + (c['Campaign Run Date']||'');
+        const leads = leadsMap[key];
+        return !leads || (leads.sourced === 0 && leads.appt === 0 && leads.qual === 0 && leads.emd === 0);
       });
 
-      const rows = dispoSorted.map(c => {
+      const renderRow = (c, dimmed) => {
         const obj = (c['Campaign Objective'] || '').trim();
         const date = c['Campaign Run Date'] || '';
         const pod = c['POD Team Name'] || '';
-        const members = c['Actual Campaign Members'] || 0;
+        const members = parseInt(c['Actual Campaign Members'] || 0);
         const key = obj + '||' + date;
         const leads = leadsMap[key] || {};
-        const hasLeads = leads.sourced > 0 || leads.appt > 0 || leads.emd > 0;
-        return `<tr>
+        const safeBase = btoa(key).replace(/[^a-zA-Z0-9]/g,'').substring(0,12);
+
+        // Extract lead rows for each clickable cell
+        const sourcedLeads = (leadsDetail[key]||[]).filter(r => r.sourced > 0);
+        const apptLeads = (leadsDetail[key]||[]).filter(r => r.appt > 0);
+        const qualLeads = (leadsDetail[key]||[]).filter(r => r.qual > 0);
+        const emdLeads = (leadsDetail[key]||[]).filter(r => r.emd > 0);
+
+        const mkBtn = (val, leads, suffix) => {
+          if (!val || val === 0) return `<span style="color:var(--text3)">0</span>`;
+          if (leads.length === 0) return `<span style="font-weight:600">${val}</span>`;
+          const safeKey = safeBase + suffix;
+          return `<span onclick="toggleCampLeads('${safeKey}')" style="font-weight:700;color:var(--blue-text);cursor:pointer;text-decoration:underline dotted" title="Click to see leads">${val} ▾</span>`;
+        };
+
+        const mkDetail = (leads, suffix) => {
+          if (leads.length === 0) return '';
+          const safeKey = safeBase + suffix;
+          return `<tr id="leads_${safeKey}" style="display:none"><td colspan="9" style="padding:0 0 8px 24px;background:var(--bg3)">
+            <table style="width:auto;font-size:10px;border-collapse:collapse">
+              <tr style="color:var(--text3)"><td style="padding:3px 10px">Name</td><td>Status</td><td>Source</td><td>Appt scheduled</td></tr>
+              ${leads.map(r => `<tr style="border-top:0.5px solid var(--border)">
+                <td style="padding:3px 10px;font-weight:500;color:var(--text)">${r.name}</td>
+                <td style="padding:3px 10px;color:var(--text2)">${r.status}</td>
+                <td style="padding:3px 10px;color:var(--text3)">${r.source}</td>
+                <td style="padding:3px 10px;color:${r.apptSched ? 'var(--blue-text)' : 'var(--text3)'}${r.apptSched ? ';font-weight:500' : ''}">${r.apptSched || '—'}</td>
+              </tr>`).join('')}
+            </table>
+          </td></tr>`;
+        };
+
+        const apptSchedStr = leads.apptSched ? `<div style="font-size:9px;color:var(--blue-text)">${fmtDate(leads.apptSched)}</div>` : '';
+
+        return `<tr style="${dimmed ? 'opacity:0.45' : ''}">
           <td><span class="badge ${campTypeClass(obj)}">${obj}</span></td>
           <td>${fmtDate(date)}</td>
-          <td style="text-align:center;color:var(--text3)">${members.toLocaleString()}</td>
-          <td style="text-align:center;font-weight:${hasLeads ? '600' : '400'};color:${hasLeads ? 'var(--text)' : 'var(--text3)'}">${leads.sourced || 0}</td>
-          <td style="text-align:center;font-weight:${leads.appt > 0 ? '600' : '400'};color:${leads.appt > 0 ? 'var(--text)' : 'var(--text3)'}">
-            ${leads.appt || 0}${leads.apptSched ? `<div style="font-size:9px;color:var(--blue-text)">${fmtDate(leads.apptSched)}</div>` : ''}
-          </td>
-          <td style="text-align:center;font-weight:${leads.qual > 0 ? '600' : '400'};color:${leads.qual > 0 ? 'var(--text)' : 'var(--text3)'}">${leads.qual || 0}</td>
-          <td style="text-align:center;font-weight:${leads.contractSent > 0 ? '600' : '400'};color:${leads.contractSent > 0 ? 'var(--text)' : 'var(--text3)'}">${leads.contractSent || 0}</td>
-          <td style="text-align:center;font-weight:${leads.emd > 0 ? '600' : '400'};color:${leads.emd > 0 ? 'var(--green-text)' : 'var(--text3)'}">${leads.emd || 0}</td>
+          <td style="text-align:center;color:var(--text3)">${members ? members.toLocaleString() : '—'}</td>
+          <td style="text-align:center">${mkBtn(leads.sourced||0, sourcedLeads, 's')}</td>
+          <td style="text-align:center">${mkBtn(leads.appt||0, apptLeads, 'a')}${leads.apptSched ? `<div style="font-size:9px;color:var(--blue-text);font-weight:500">${leads.apptSched}</div>` : ''}</td>
+          <td style="text-align:center">${mkBtn(leads.qual||0, qualLeads, 'q')}</td>
+          <td style="text-align:center;font-weight:${(leads.contractSent||0)>0?'600':'400'};color:${(leads.contractSent||0)>0?'var(--text)':'var(--text3)'}">${leads.contractSent||0}</td>
+          <td style="text-align:center;font-weight:${(leads.emd||0)>0?'700':'400'};color:${(leads.emd||0)>0?'var(--green-text)':'var(--text3)'}">${mkBtn(leads.emd||0, emdLeads, 'e')}</td>
           <td style="font-size:10px;color:var(--text3)">${pod}</td>
-        </tr>`;
-      }).join('');
+        </tr>
+        ${mkDetail(sourcedLeads, 's')}
+        ${mkDetail(apptLeads, 'a')}
+        ${mkDetail(qualLeads, 'q')}
+        ${mkDetail(emdLeads, 'e')}`;
+      };
 
-      // Totals
-      const totals = Object.values(leadsMap).reduce((t, c) => ({ sourced: t.sourced + c.sourced, appt: t.appt + c.appt, qual: t.qual + c.qual, contractSent: t.contractSent + c.contractSent, emd: t.emd + c.emd }), { sourced: 0, appt: 0, qual: 0, contractSent: 0, emd: 0 });
+      const totals = Object.values(leadsMap).reduce((t, c) => ({ sourced: t.sourced+c.sourced, appt: t.appt+c.appt, qual: t.qual+c.qual, contractSent: t.contractSent+c.contractSent, emd: t.emd+c.emd }), { sourced:0, appt:0, qual:0, contractSent:0, emd:0 });
       const totalsRow = `<tr style="border-top:2px solid var(--border);background:var(--bg3)">
-        <td style="font-weight:700;font-size:11px">TOTAL</td><td></td>
-        <td></td>
+        <td style="font-weight:700;font-size:11px">TOTAL</td><td></td><td></td>
         <td style="text-align:center;font-weight:700">${totals.sourced}</td>
         <td style="text-align:center;font-weight:700">${totals.appt}</td>
         <td style="text-align:center;font-weight:700">${totals.qual}</td>
@@ -993,25 +1064,30 @@ function showCard(id) {
         <td></td>
       </tr>`;
 
-      return rows + totalsRow;
+      return active.map(c => renderRow(c, false)).join('') +
+             (inactive.length > 0 ? `<tr><td colspan="9" style="padding:6px 14px;font-size:10px;color:var(--text3);background:var(--bg2);border-top:0.5px solid var(--border)">${inactive.length} campaign${inactive.length!==1?'s':''} ran with no leads recorded</td></tr>` : '') +
+             totalsRow;
     }
 
-    // Fallback to leads-only aggregation when no dispo file
+    // Fallback: leads-only aggregation
     if (aggCamps.length > 0) {
-      const sorted = [...aggCamps].sort((a, b) => new Date(b.date) - new Date(a.date));
-      const summaryRows = sorted.map(c => `<tr>
+      const active = aggCamps.filter(c => c.sourced > 0 || c.appt > 0 || c.qual > 0 || c.emd > 0);
+      if (active.length === 0) return `<tr><td colspan="9"><div class="no-data">No leads recorded yet for any campaign</div></td></tr>`;
+      return active.map(c => `<tr>
         <td><span class="badge ${campTypeClass(c.type)}">${c.type}</span></td>
-        <td>${fmtDate(c.date)}</td>
-        <td style="text-align:center;color:var(--text3)">—</td>
-        <td style="text-align:center;font-weight:600">${c.sourced || 0}</td>
-        <td style="text-align:center;font-weight:600">${c.appt || 0}${c.apptSched ? `<div style="font-size:9px;color:var(--blue-text)">${fmtDate(c.apptSched)}</div>` : ''}</td>
-        <td style="text-align:center;font-weight:600">${c.qual || 0}</td>
-        <td style="text-align:center;font-weight:600">${c.contractSent || 0}</td>
-        <td style="text-align:center;font-weight:600;color:var(--green-text)">${c.emd || 0}</td>
+        <td>${fmtDate(c.date)}</td><td style="color:var(--text3)">—</td>
+        <td style="text-align:center;font-weight:600">${c.sourced||0}</td>
+        <td style="text-align:center;font-weight:600">${c.appt||0}${c.apptSched?`<div style="font-size:9px;color:var(--blue-text)">${fmtDate(c.apptSched)}</div>`:''}</td>
+        <td style="text-align:center;font-weight:600">${c.qual||0}</td>
+        <td style="text-align:center;font-weight:600">${c.contractSent||0}</td>
+        <td style="text-align:center;font-weight:600;color:var(--green-text)">${c.emd||0}</td>
         <td></td>
-      </tr>`).join('');
-      const totals = aggCamps.reduce((t, c) => ({ sourced: t.sourced + c.sourced, appt: t.appt + c.appt, qual: t.qual + c.qual, contractSent: t.contractSent + c.contractSent, emd: t.emd + c.emd }), { sourced: 0, appt: 0, qual: 0, contractSent: 0, emd: 0 });
-      return summaryRows + `<tr style="border-top:2px solid var(--border);background:var(--bg3)"><td style="font-weight:700">TOTAL</td><td></td><td></td><td style="text-align:center;font-weight:700">${totals.sourced}</td><td style="text-align:center;font-weight:700">${totals.appt}</td><td style="text-align:center;font-weight:700">${totals.qual}</td><td style="text-align:center;font-weight:700">${totals.contractSent}</td><td style="text-align:center;font-weight:700;color:var(--green-text)">${totals.emd}</td><td></td></tr>`;
+      </tr>`).join('') + `<tr style="border-top:2px solid var(--border);background:var(--bg3)"><td style="font-weight:700">TOTAL</td><td></td><td></td>
+        <td style="text-align:center;font-weight:700">${aggCamps.reduce((s,c)=>s+c.sourced,0)}</td>
+        <td style="text-align:center;font-weight:700">${aggCamps.reduce((s,c)=>s+c.appt,0)}</td>
+        <td style="text-align:center;font-weight:700">${aggCamps.reduce((s,c)=>s+c.qual,0)}</td>
+        <td style="text-align:center;font-weight:700">${aggCamps.reduce((s,c)=>s+c.contractSent,0)}</td>
+        <td style="text-align:center;font-weight:700;color:var(--green-text)">${aggCamps.reduce((s,c)=>s+c.emd,0)}</td><td></td></tr>`;
     }
 
     return `<tr><td colspan="9"><div class="no-data">No campaigns logged</div></td></tr>`;
@@ -1193,52 +1269,13 @@ function showCard(id) {
             </div>`;
 
           return `
-            <div style="margin:0 8px">
-              <div style="position:relative;height:100px">
-                <div style="position:absolute;top:50%;left:0;right:0;height:4px;background:var(--bg3);border-radius:2px;transform:translateY(-50%)">
-                  <div style="position:absolute;left:0;top:0;height:100%;width:${todayPct}%;background:${barColor};border-radius:2px"></div>
-                  ${milestones.map(dotHtml).join('')}
-                </div>
+            <div style="position:relative;height:100px;margin:0 8px">
+              <div style="position:absolute;top:50%;left:0;right:0;height:4px;background:var(--bg3);border-radius:2px;transform:translateY(-50%)">
+                <div style="position:absolute;left:0;top:0;height:100%;width:${todayPct}%;background:${barColor};border-radius:2px"></div>
+                ${milestones.map(dotHtml).join('')}
               </div>
-            ${(() => {
-              // Build price trend line below the timeline
-              if (realDrops.length === 0) return pdOk ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;text-align:center">No price drop dates in report for this listing</div>' : '';
-              // All price points: original at contract start, then each drop, then current at today
-              const origPrice = pdHistory.find(d => d.label === 'Original');
-              const pricePoints = [
-                ...(origPrice ? [{ pctX: 0, price: origPrice.price, isOrig: true }] : []),
-                ...realDrops.map(d => ({ pctX: pct(d.date.getTime()), price: d.price })),
-                { pctX: todayPct, price: realDrops[realDrops.length-1]?.price || origPrice?.price, isToday: true }
-              ].filter(p => p.price);
-              if (pricePoints.length < 2) return '';
-              const prices = pricePoints.map(p => p.price);
-              const minP = Math.min(...prices), maxP = Math.max(...prices);
-              const range = maxP - minP || 1;
-              const H = 48; // height of the price chart area
-              const yPct = p => ((maxP - p) / range) * (H - 12) + 6;
-              const pts = pricePoints.map(p => `${p.pctX},${yPct(p.price)}`).join(' ');
-              // Area fill points
-              const areaPath = `0,${H} ` + pricePoints.map(p => `${p.pctX},${yPct(p.price)}`).join(' ') + ` ${pricePoints[pricePoints.length-1].pctX},${H}`;
-              return `
-                <div style="position:relative;height:${H}px;margin:4px 8px 0">
-                  <svg width="100%" height="${H}" viewBox="0 0 100 ${H}" preserveAspectRatio="none" style="position:absolute;top:0;left:0;width:100%;height:100%">
-                    <defs>
-                      <linearGradient id="priceGrad_${id}" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="#e24b4a" stop-opacity="0.25"/>
-                        <stop offset="100%" stop-color="#e24b4a" stop-opacity="0.02"/>
-                      </linearGradient>
-                    </defs>
-                    <polygon points="${areaPath}" fill="url(#priceGrad_${id})"/>
-                    <polyline points="${pts}" fill="none" stroke="#e24b4a" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
-                    ${pricePoints.map(p => `
-                      <circle cx="${p.pctX}" cy="${yPct(p.price)}" r="${p.isOrig || p.isToday ? 2.5 : 2}" fill="${p.isOrig ? '#9b9a94' : p.isToday ? '#e24b4a' : '#ef9f27'}" vector-effect="non-scaling-stroke"/>
-                    `).join('')}
-                  </svg>
-                  <div style="position:absolute;left:0;top:2px;font-size:9px;color:var(--text3)">${fmt(maxP)}</div>
-                  <div style="position:absolute;left:0;bottom:2px;font-size:9px;color:var(--text3)">${fmt(minP)}</div>
-                  <div style="position:absolute;right:0;top:${yPct(pricePoints[pricePoints.length-1].price) - 8}px;font-size:9px;font-weight:600;color:var(--red-text)">${fmt(pricePoints[pricePoints.length-1].price)}</div>
-                </div>`;
-            })()}</div>`;
+            </div>
+            ${realDrops.length > 0 ? '' : pdOk ? '<div style="font-size:10px;color:var(--text3);margin-top:4px;text-align:center">No price drop dates in report for this listing</div>' : ''}`;
         })()}
       </div>
 
@@ -1890,6 +1927,12 @@ function updateSortHeader() {
     th.classList.toggle('sort-active', thCol === sortCol);
     if (arrow) arrow.textContent = thCol === sortCol ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ↕';
   });
+}
+
+function toggleCampLeads(key) {
+  const el = document.getElementById('leads_' + key);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
 }
 
 function setSort(col) {
