@@ -432,7 +432,16 @@ async function loadFromSheets() {
     fetchCSV('sf'), fetchCSV('pd'), fetchCSV('camp'), fetchCSV('zillow'), fetchCSV('dispo'), fetchCSV('ib')
   ]);
 
-  if (sfRows.length > 0) { listings = sfRows.map(parseRow).filter(Boolean); sfOk = true; }
+  if (sfRows.length > 0) {
+    listings = sfRows.map(parseRow).filter(Boolean);
+    sfOk = true;
+    // Diagnostic: surface column names so we can match against expected variants
+    const cols = Object.keys(sfRows[0] || {});
+    console.log('[Property Performance Report] all columns:', cols);
+    console.log('[Property Performance Report] view-related:', cols.filter(c => /view/i.test(c)));
+    console.log('[Property Performance Report] save-related:', cols.filter(c => /save/i.test(c)));
+    console.log('[Property Performance Report] dom-related:',  cols.filter(c => /dom/i.test(c)));
+  }
   if (pdRows.length > 0) { priceDropData = pdRows.filter(r => r['Listing #']); pdOk = true; }
   if (campRows.length > 0) { outboundLeads = campRows.filter(r => r['The Market Hub #']); campOk = true; }
   if (zillowRows.length > 0) { zillowData = zillowRows.filter(r => r['Listing #']); zillowOk = true; }
@@ -492,7 +501,7 @@ function parseRow(row) {
     listP, contractP,
     lastListP: n(gv(row, 'Last Cash List Price')), profit: n(gv(row, 'Potential Profit')),
     equity: n(gv(row, 'Equity Capture')), pricePct: (() => { const v = gv(row, 'Price Drop %'); if (!v) return 0; const s = v.toString().replace('%','').trim(); return parseFloat(s) / (s.includes('.') && parseFloat(s) < 1 ? 1 : 100) || 0; })(),
-    saves: n(gv(row, 'Zillow Saves', 'ZSaves', 'Zillow_Saves', 'Saves', 'Z Saves')), zViews: n(gv(row, 'Zillow Views', 'ZViews', 'Zillow_Views', 'Views', 'Z Views')), mlsSaves: n(gv(row, 'MLS Saves')),
+    saves: n(gv(row, 'Zillow Saves', 'ZSaves', 'Zillow_Saves', 'Saves', 'Z Saves')), zViews: n(gv(row, 'Zillow Views', 'ZViews', 'Zillow_Views', 'Views', 'Z Views', 'Zillow Page Views', 'Page Views', 'Property Views', 'Listing Views', 'Zillow Property Views', 'Total Views', 'Zillow Last 30 Days')), mlsSaves: n(gv(row, 'MLS Saves')),
     zillowLink: gv(row, 'Zillow Link', 'Zillow URL', 'zillow link') || '',
     dom: n(gv(row, 'MLS DOM')), webDom: n(gv(row, 'Website DOM')),
     expiry: n(gv(row, '# of Days to Expiration')), drops: i(gv(row, '# of Price Drops')),
@@ -1306,7 +1315,14 @@ function showCard(id) {
           if (!contractDate) return '<div class="no-data">Timeline unavailable — missing contract date</div>';
 
           // If no expiry, use contract date + 2 years as display window
-          const effectiveExpiry = expiryDate || new Date(contractDate.getTime() + 730 * 86400000);
+          // If no expiry date, anchor to Today + ~30 days so Today sits near the right and drops aren't compressed
+          // Also extend to cover any drop dates that fall after Today (rare but keeps them visible)
+          const latestDropTime = pdHistory
+            .map(d => d.date ? new Date(d.date).getTime() : NaN)
+            .filter(t => !isNaN(t))
+            .reduce((a, b) => Math.max(a, b), today.getTime());
+          const fallbackExpiry = new Date(Math.max(today.getTime(), latestDropTime) + 30 * 86400000);
+          const effectiveExpiry = expiryDate || fallbackExpiry;
           const noExpiry = !expiryDate;
 
           const start = contractDate.getTime();
