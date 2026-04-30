@@ -901,6 +901,7 @@ function renderPortfolio() {
       </td>`;
     tbody.appendChild(tr);
   });
+  updateSortHeader();
 }
 
 // ── CARD RENDER ───────────────────────────────────────────────────────────
@@ -1774,19 +1775,21 @@ function fpei(val, btn) {
   closeCard(); renderPortfolio();
 }
 
+function updateSortHeader() {
+  const head = document.getElementById('portfolioHead');
+  if (!head) return;
+  head.querySelectorAll('th.sortable').forEach(th => {
+    const thCol = th.getAttribute('onclick').match(/setSort\('(.+?)'\)/)?.[1];
+    const arrow = th.querySelector('.sort-arrow');
+    th.classList.toggle('sort-active', thCol === sortCol);
+    if (arrow) arrow.textContent = thCol === sortCol ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ↕';
+  });
+}
+
 function setSort(col) {
   if (sortCol === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
   else { sortCol = col; sortDir = 'asc'; }
-  // Update header visuals
-  const head = document.getElementById('portfolioHead');
-  if (head) {
-    head.querySelectorAll('th.sortable').forEach(th => {
-      const thCol = th.getAttribute('onclick').match(/setSort\('(.+?)'\)/)?.[1];
-      const arrow = th.querySelector('.sort-arrow');
-      th.classList.toggle('sort-active', thCol === sortCol);
-      if (arrow) arrow.textContent = thCol === sortCol ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ' ↕';
-    });
-  }
+  updateSortHeader();
   closeCard(); renderPortfolio();
 }
 
