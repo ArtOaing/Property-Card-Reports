@@ -1911,8 +1911,9 @@ function toggleCampLeads(key) {
   const el = document.getElementById('leads_' + key);
   if (!el) return;
   const isOpen = el.style.display !== 'none';
-  // Close all other open detail rows
-  document.querySelectorAll('[id^="leads_"]').forEach(r => r.style.display = 'none');
+  // Close siblings from same campaign (same safeBase — all but last char)
+  const base = key.slice(0, -1);
+  document.querySelectorAll('[id^="leads_' + base + '"]').forEach(r => r.style.display = 'none');
   // Toggle this one
   if (!isOpen) el.style.display = 'table-row';
 }
