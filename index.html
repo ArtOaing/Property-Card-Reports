@@ -480,6 +480,10 @@ async function loadFromSheets() {
 // Load on open + auto-refresh every 4 hours
 window.addEventListener('DOMContentLoaded', loadFromSheets);
 setInterval(loadFromSheets, 4 * 60 * 60 * 1000);
+// Esc closes the open card
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && activeCardId) closeCard();
+});
 
 // ── DATA PARSING ──────────────────────────────────────────────────────────
 function gv(row, ...keys) {
@@ -1291,7 +1295,7 @@ function showCard(id) {
         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
           ${l.zillowLink ? `<a href="${l.zillowLink}" target="_blank" style="font-size:11px;font-weight:600;color:var(--teal-text);text-decoration:none;padding:6px 14px;border-radius:var(--r-md);border:1px solid var(--teal-text);background:var(--teal-bg);white-space:nowrap">Zillow ↗</a>` : ''}
           ${l.landId ? `<a href="${l.landId}" target="_blank" style="font-size:11px;font-weight:600;color:var(--blue-text);text-decoration:none;padding:6px 14px;border-radius:var(--r-md);border:1px solid var(--blue-border);background:var(--blue-bg);white-space:nowrap">LandID ↗</a>` : ''}
-          <button onclick="closeCard()" title="Close card" style="font-size:14px;font-weight:600;color:var(--text2);background:var(--bg2);border:1px solid var(--border2);width:32px;height:32px;border-radius:var(--r-md);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin-left:4px" onmouseover="this.style.background='var(--red-bg)';this.style.color='var(--red-text)';this.style.borderColor='var(--red-border)'" onmouseout="this.style.background='var(--bg2)';this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">✕</button>
+          <button onclick="closeCard()" title="Close card (Esc)" style="position:sticky;top:60px;font-size:14px;font-weight:600;color:var(--text2);background:var(--bg2);border:1px solid var(--border2);width:32px;height:32px;border-radius:var(--r-md);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin-left:4px;z-index:10" onmouseover="this.style.background='var(--red-bg)';this.style.color='var(--red-text)';this.style.borderColor='var(--red-border)'" onmouseout="this.style.background='var(--bg2)';this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">✕</button>
         </div>
       </div>
       <!-- Row 2: Address / State / County -->
@@ -2051,13 +2055,18 @@ function showCard(id) {
     </div>
   </div>`;
 
-  // Scroll the clicked row into view so the user sees the card immediately under it.
-  // Use the host row as anchor — it sits directly below the data row.
+  // Only scroll if the row is actually off-screen. 'nearest' uses minimal movement.
+  const dataRow = [...document.querySelectorAll('tr.dr')].find(r => r.textContent.includes(l.mainListing || l.id));
   const hostRow = document.getElementById('inline-card-row-' + l.id);
-  if (hostRow) {
-    // Small delay so the DOM has the new content laid out before measuring
-    setTimeout(() => hostRow.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-  }
+  setTimeout(() => {
+    if (!dataRow) return;
+    const rect = dataRow.getBoundingClientRect();
+    const offscreen = rect.top < 60 || rect.bottom > (window.innerHeight - 100);
+    if (offscreen) {
+      dataRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    // If row is on screen but the card extends below the fold, do nothing — user can scroll naturally.
+  }, 50);
   setTimeout(() => renderCharts(id, savesData, priceData), 150);
 }
 
