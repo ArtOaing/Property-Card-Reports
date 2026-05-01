@@ -1422,7 +1422,8 @@ function showCard(id) {
                   }
                 : null);
 
-          // Build milestones — alternate above/below for drops to avoid label collisions
+          // Build milestones — first pass assigns alternating above/below, then we run a collision detector
+          // to push overlapping labels into multiple lanes (up to 3 above, 3 below).
           const dropOffset = listedMilestone ? 1 : 0;
           const milestones = [
             { pct: 0, color: 'var(--green-border)', label: 'Contracted', date: fmtShort(contractDate), above: false },
@@ -1440,10 +1441,62 @@ function showCard(id) {
             ...(noExpiry ? [] : [{ pct: 100, color: daysLeft !== null && daysLeft < 15 ? 'var(--red-border)' : 'var(--text3)', label: 'Expires', date: fmtShort(effectiveExpiry) + ' · ' + (daysLeft < 0 ? 'Expired' : daysLeft + 'd left'), above: false, isEnd: true }]),
           ];
 
-          const ABOVE_TOP = 6;
-          const BELOW_TOP = 22;
+          // Collision-aware lane assignment.
+          // Each label is ~80px wide. With a 1100px-ish bar, that's ~7% of bar per label.
+          // We use 6% as the collision threshold. Lanes 0/1/2 stack above, lanes 0/1/2 stack below.
+          // Today and Expires are pinned to lane 0 (closest to bar) so they read first.
+          const COLLISION_PCT = 6;
+          const aboveLanes = [];  // each lane is array of milestone indices
+          const belowLanes = [];
 
-          const dotHtml = m => `
+          // Clone & sort by pct so collision check walks left-to-right
+          const ordered = milestones.map((m, i) => ({ m, originalIdx: i })).sort((a, b) => a.m.pct - b.m.pct);
+
+          for (const { m, originalIdx } of ordered) {
+            // Pinned milestones stay on their original side, lane 0
+            if (m.isToday || m.isEnd || m.label === 'Contracted') {
+              m.lane = 0;
+              const lanes = m.above ? aboveLanes : belowLanes;
+              if (!lanes[0]) lanes[0] = [];
+              lanes[0].push(m);
+              continue;
+            }
+            // Try original side first (preserves the alternating pattern when there's room)
+            const tryOrder = m.above ? ['above', 'below'] : ['below', 'above'];
+            let placed = false;
+            for (const side of tryOrder) {
+              const lanes = side === 'above' ? aboveLanes : belowLanes;
+              for (let lane = 0; lane < 3; lane++) {
+                const existing = lanes[lane] || [];
+                const collides = existing.some(other => Math.abs(other.pct - m.pct) < COLLISION_PCT);
+                if (!collides) {
+                  if (!lanes[lane]) lanes[lane] = [];
+                  lanes[lane].push(m);
+                  m.above = (side === 'above');
+                  m.lane = lane;
+                  placed = true;
+                  break;
+                }
+              }
+              if (placed) break;
+            }
+            // Fallback — if all 6 lanes are full at this pct, force into bottom lane 2 (overflow case)
+            if (!placed) {
+              if (!belowLanes[2]) belowLanes[2] = [];
+              belowLanes[2].push(m);
+              m.above = false;
+              m.lane = 2;
+            }
+          }
+
+          // Lane heights — each lane needs ~38px to fit price + sublabel + date stacked (3 lines @ 12px line-height)
+          const LANE_HEIGHT = 38;
+          const BAR_GAP = 6; // gap between bar edge and innermost label
+
+          const dotHtml = m => {
+            const lane = m.lane || 0;
+            const labelOffset = BAR_GAP + lane * LANE_HEIGHT;
+            return `
             <div style="position:absolute;left:${m.pct}%;top:50%;transform:translate(-50%,-50%);z-index:2">
               ${m.isToday
                 ? `<div style="width:14px;height:14px;border-radius:50%;background:var(--bg);border:3px solid ${m.color};box-shadow:0 0 0 3px ${m.color}22"></div>`
@@ -1452,16 +1505,24 @@ function showCard(id) {
                   : m.isPriceDrop
                     ? `<div style="width:10px;height:10px;border-radius:50%;background:var(--amber-border);border:2px solid var(--bg)"></div>`
                     : `<div style="width:12px;height:12px;border-radius:50%;background:${m.color};border:2px solid var(--bg)"></div>`}
-              <div style="position:absolute;${m.above ? 'bottom:' + ABOVE_TOP + 'px' : 'top:' + BELOW_TOP + 'px'};${m.isEnd ? 'right:0;text-align:right' : 'left:50%;transform:translateX(-50%);text-align:center'};white-space:nowrap;line-height:1.5">
+              <div style="position:absolute;${m.above ? 'bottom:' + labelOffset + 'px' : 'top:' + (labelOffset + 16) + 'px'};${m.isEnd ? 'right:0;text-align:right' : 'left:50%;transform:translateX(-50%);text-align:center'};white-space:nowrap;line-height:1.4">
                 <div style="font-size:9px;font-weight:${m.isToday ? '700' : '600'};color:${m.isToday ? m.color : m.isOriginal ? 'var(--blue-text)' : m.isPriceDrop ? 'var(--amber-text)' : 'var(--text3)'};text-transform:uppercase;letter-spacing:0.04em">${m.label}</div>
                 ${m.sublabel ? `<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;margin-top:1px">${m.sublabel}</div>` : ''}
                 <div style="font-size:10px;color:${m.label === 'Expires' && daysLeft < 15 ? 'var(--red-text)' : 'var(--text2)'}">${m.date}</div>
               </div>
             </div>`;
+          };
+
+          // Container height adapts to deepest lane in use
+          const maxAboveLane = aboveLanes.length;
+          const maxBelowLane = belowLanes.length;
+          const aboveHeight = Math.max(50, BAR_GAP + maxAboveLane * LANE_HEIGHT + 8);
+          const belowHeight = Math.max(50, BAR_GAP + maxBelowLane * LANE_HEIGHT + 8);
+          const totalHeight = aboveHeight + belowHeight + 4; // 4px for the bar itself
 
           return `
-            <div style="position:relative;height:120px;margin:0 8px">
-              <div style="position:absolute;top:50%;left:0;right:0;height:4px;background:var(--bg3);border-radius:2px;transform:translateY(-50%)">
+            <div style="position:relative;height:${totalHeight}px;margin:0 8px">
+              <div style="position:absolute;top:${aboveHeight}px;left:0;right:0;height:4px;background:var(--bg3);border-radius:2px">
                 <div style="position:absolute;left:0;top:0;height:100%;width:${todayPct}%;background:${barColor};border-radius:2px"></div>
                 ${milestones.map(dotHtml).join('')}
               </div>
