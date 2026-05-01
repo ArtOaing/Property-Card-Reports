@@ -1056,6 +1056,14 @@ function renderPortfolio() {
         </div>
       </td>`;
     tbody.appendChild(tr);
+    // Inline card host directly under this row, when active
+    if (activeCardId === l.id) {
+      const hostTr = document.createElement('tr');
+      hostTr.className = 'inline-card-row';
+      hostTr.id = 'inline-card-row-' + l.id;
+      hostTr.innerHTML = `<td colspan="15" style="padding:0;background:var(--bg3);border-bottom:0.5px solid var(--border)"><div id="inlineCardArea"></div></td>`;
+      tbody.appendChild(hostTr);
+    }
   });
   updateSortHeader();
 }
@@ -1252,7 +1260,13 @@ function showCard(id) {
 
   const flagsHtml = f.length > 0 ? f.map(x => `<span class="badge b-r">${x}</span>`).join(' ') : '<span class="badge b-g">No flags</span>';
 
-  document.getElementById('cardArea').innerHTML = `
+  // Make sure the inline host row exists — renderPortfolio creates it but if showCard is called from a place that hasn't re-rendered, force a render.
+  if (!document.getElementById('inlineCardArea')) {
+    renderPortfolio();
+  }
+  const target = document.getElementById('inlineCardArea');
+  if (!target) return;
+  target.innerHTML = `
   <div class="card-wrap">
 
     <div class="card-head">
@@ -1277,6 +1291,7 @@ function showCard(id) {
         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
           ${l.zillowLink ? `<a href="${l.zillowLink}" target="_blank" style="font-size:11px;font-weight:600;color:var(--teal-text);text-decoration:none;padding:6px 14px;border-radius:var(--r-md);border:1px solid var(--teal-text);background:var(--teal-bg);white-space:nowrap">Zillow ↗</a>` : ''}
           ${l.landId ? `<a href="${l.landId}" target="_blank" style="font-size:11px;font-weight:600;color:var(--blue-text);text-decoration:none;padding:6px 14px;border-radius:var(--r-md);border:1px solid var(--blue-border);background:var(--blue-bg);white-space:nowrap">LandID ↗</a>` : ''}
+          <button onclick="closeCard()" title="Close card" style="font-size:14px;font-weight:600;color:var(--text2);background:var(--bg2);border:1px solid var(--border2);width:32px;height:32px;border-radius:var(--r-md);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin-left:4px" onmouseover="this.style.background='var(--red-bg)';this.style.color='var(--red-text)';this.style.borderColor='var(--red-border)'" onmouseout="this.style.background='var(--bg2)';this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">✕</button>
         </div>
       </div>
       <!-- Row 2: Address / State / County -->
@@ -2036,14 +2051,23 @@ function showCard(id) {
     </div>
   </div>`;
 
-  document.getElementById('cardArea').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Scroll the clicked row into view so the user sees the card immediately under it.
+  // Use the host row as anchor — it sits directly below the data row.
+  const hostRow = document.getElementById('inline-card-row-' + l.id);
+  if (hostRow) {
+    // Small delay so the DOM has the new content laid out before measuring
+    setTimeout(() => hostRow.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
   setTimeout(() => renderCharts(id, savesData, priceData), 150);
 }
 
 function closeCard() {
   activeCardId = null;
   destroyCharts();
-  document.getElementById('cardArea').innerHTML = '';
+  const legacyArea = document.getElementById('cardArea');
+  if (legacyArea) legacyArea.innerHTML = '';
+  const inlineArea = document.getElementById('inlineCardArea');
+  if (inlineArea) inlineArea.innerHTML = '';
   renderPortfolio();
 }
 
