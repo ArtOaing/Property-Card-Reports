@@ -44,7 +44,7 @@
 
   /* ── TOP BAR ── */
   .topbar { background: var(--bg); border-bottom: 0.5px solid var(--border); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 52px; position: sticky; top: 0; z-index: 100; }
-  .logo { font-size: 30px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+  .logo { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
   .logo span { color: var(--blue-text); }
   .topbar-right { font-size: 11px; color: var(--text3); }
 
@@ -244,8 +244,8 @@
   <!-- LOADER -->
   <div class="loader-bar" id="loaderBar">
     <div>
-      <div style="font-size:30px;font-weight:600;color:var(--text);margin-bottom:4px">MaxAcres.com · Portfolio Dashboard</div>
-      <div style="font-size:11px;color:var(--text3)">Live data from GitHub · Auto-refreshes every 4 hours</div>
+      <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:4px">MaxAcres.com · Portfolio Dashboard</div>
+      <div style="font-size:12px;color:var(--text3)">Live data from GitHub · Auto-refreshes every 4 hours</div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
       <button class="refresh-btn" id="refreshBtn" onclick="loadFromSheets()">⟳ Refresh</button>
@@ -496,7 +496,11 @@ function gv(row, ...keys) {
 
 function parseRow(row) {
   const id = gv(row, 'The Sales Hub', 'Sales Hub', 'SH ID'); if (!id) return null;
-  const n = v => parseFloat(v) || null;
+  const n = v => {
+    if (v === null || v === undefined || v === '') return null;
+    const num = parseFloat(v);
+    return isNaN(num) ? null : num;
+  };
   const i = v => parseInt(v) || 0;
   const b = v => (v || '').toString().toLowerCase() === 'yes';
   const listP = n(gv(row, 'Current Cash Price'));
