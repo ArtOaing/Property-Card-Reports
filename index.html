@@ -448,7 +448,15 @@ async function loadFromSheets() {
   if (pdRows.length > 0) { priceDropData = pdRows.filter(r => r['Listing #']); pdOk = true; }
   if (campRows.length > 0) { outboundLeads = campRows.filter(r => r['The Market Hub #']); campOk = true; }
   if (zillowRows.length > 0) { zillowData = zillowRows.filter(r => r['Listing #']); zillowOk = true; }
-  if (dispoRows.length > 0) { dispoData = dispoRows.filter(r => r['The Market Hub #'] || r['Listing #']); dispoOk = true; }
+  if (dispoRows.length > 0) {
+    dispoData = dispoRows.filter(r => r['The Market Hub #'] || r['Listing #']);
+    dispoOk = true;
+    // Diagnostic — show columns in dispo CSV and a sample row, so we can verify the matcher is reading the right fields
+    const cols = Object.keys(dispoRows[0] || {});
+    console.log('[Dispo CSV] all columns:', cols);
+    console.log('[Dispo CSV] sample row:', dispoRows[0]);
+    console.log('[Dispo CSV] campaign-name-related columns:', cols.filter(c => /campaign|name|objective/i.test(c)));
+  }
   if (ibRows.length > 0) { inboundLeads = ibRows.filter(r => r['The Market Hub']); ibOk = true; }
 
   if (sfOk) {
@@ -1060,6 +1068,12 @@ function showCard(id) {
   const lc = getCamps(id), lf = getFbacks(id);
   const ol = l.mainListing ? getOutboundLeads(l.mainListing) : [];
   const dc = l.mainListing ? getDispoCampaigns(l.mainListing) : [];
+  // Diagnostic for the outgoing-column matcher
+  console.log('[Outgoing] listing', l.mainListing || l.id, '— dispo rows:', dc.length, dc.map(r => ({
+    objective: r['Campaign Objective'],
+    name: r['Campaign Name'],
+    keys: Object.keys(r)
+  })));
   const pdRow = l.mainListing ? getPriceDrop(l.mainListing) : null;
   const pdHistory = parsePriceDropHistory(pdRow);
   const pdStatus = pdRow ? (pdRow['Price Drop Status'] || '') : '';
