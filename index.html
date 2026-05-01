@@ -1325,7 +1325,7 @@ function showCard(id) {
         ${(() => {
           const today = new Date();
           const contractDate = l.contractDate ? new Date(l.contractDate) : null;
-          const listDate = l.dom !== null ? new Date(today.getTime() - l.dom * 86400000) : null;
+          const listDate = l.webDom !== null ? new Date(today.getTime() - l.webDom * 86400000) : (l.dom !== null ? new Date(today.getTime() - l.dom * 86400000) : null);
           const expiryDate = l.expiry !== null && l.expiry >= 0 && l.expiry < 3650 ? new Date(today.getTime() + l.expiry * 86400000) : null;
 
           if (!contractDate) return '<div class="no-data">Timeline unavailable — missing contract date</div>';
