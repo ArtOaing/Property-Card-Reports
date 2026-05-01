@@ -797,14 +797,23 @@ function aggregateCampaigns(leads) {
 // ── SCORING & FLAGS ───────────────────────────────────────────────────────
 function calcExposure(l, lc, ol) {
   ol = ol || [];
+  const dc = l.mainListing ? getDispoCampaigns(l.mainListing) : [];
+  const dispoMatches = (kw) => dc.some(c => {
+    const obj = (c['Campaign Objective'] || c['Campaign Name'] || '').toLowerCase();
+    return obj.includes(kw);
+  });
   const hasRealtor = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('realtor')) ||
-                     ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('realtor'));
+                     ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('realtor')) ||
+                     dispoMatches('realtor');
   const hasInvestor = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('investor')) ||
-                      ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('investor'));
+                      ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('investor')) ||
+                      dispoMatches('investor');
   const hasBuyer = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('buyer')) ||
-                   ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('buyer'));
+                   ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('buyer')) ||
+                   dispoMatches('buyer');
   const hasNeighbor = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('neighbor')) ||
-                      ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('neighbor'));
+                      ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('neighbor')) ||
+                      dispoMatches('neighbor');
 
   if (l.mls) {
     let score = 35;
@@ -1030,8 +1039,10 @@ function renderPortfolio() {
         <div style="display:flex;gap:5px;align-items:center">
           ${[['BB','buyer'], ['RT','realtor'], ['IV','investor'], ['NG','neighbor']].map(([init, type]) => {
             const ol2 = l.mainListing ? getOutboundLeads(l.mainListing) : [];
+            const dc2 = l.mainListing ? getDispoCampaigns(l.mainListing) : [];
             const ran = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes(type)) ||
-                        ol2.some(r => (r['Campaign Objective'] || '').toLowerCase().includes(type));
+                        ol2.some(r => (r['Campaign Objective'] || '').toLowerCase().includes(type)) ||
+                        dc2.some(c => ((c['Campaign Objective'] || c['Campaign Name'] || '').toLowerCase()).includes(type));
             return `<div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;background:${ran ? 'var(--blue-bg)' : 'var(--bg2)'};color:${ran ? 'var(--blue-text)' : 'var(--text3)'};border:1.5px solid ${ran ? 'var(--blue-border)' : 'var(--border)'}">${init}</div>`;
           }).join('')}
         </div>
