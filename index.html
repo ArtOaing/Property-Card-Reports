@@ -441,6 +441,9 @@ async function loadFromSheets() {
     console.log('[Property Performance Report] view-related:', cols.filter(c => /view/i.test(c)));
     console.log('[Property Performance Report] save-related:', cols.filter(c => /save/i.test(c)));
     console.log('[Property Performance Report] dom-related:',  cols.filter(c => /dom/i.test(c)));
+    console.log('[Property Performance Report] deal-related:', cols.filter(c => /deal|type/i.test(c)));
+    // Sample dealType values from the first 5 listings
+    console.log('[Property Performance Report] dealType sample:', listings.slice(0, 5).map(l => ({ id: l.mainListing || l.id, dealType: l.dealType })));
   }
   if (pdRows.length > 0) { priceDropData = pdRows.filter(r => r['Listing #']); pdOk = true; }
   if (campRows.length > 0) { outboundLeads = campRows.filter(r => r['The Market Hub #']); campOk = true; }
