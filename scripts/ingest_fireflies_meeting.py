@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
-Ingest a single Fireflies meeting into the Notion 'Fireflies Meetings' inbox database.
+Update an existing Fireflies meeting row in The Acre Hub's Fireflies Meetings database
+with the full transcript text.
 
-Triggered by .github/workflows/ingest-fireflies-meeting.yml when Make.com sends a
-repository_dispatch with a Fireflies meeting ID. The script:
-  1. Fetches the full transcript from Fireflies (sentences → joined text)
-  2. Checks the Notion inbox for an existing row with the same meeting ID — skip if found
-  3. Creates a new row with title, date, duration, host, transcript URL, and full transcript
-The Notion Agent fires automatically when the row appears, fanning out to per-transaction pages.
+Architecture:
+  Fireflies meeting ends
+    → Fireflies-Notion integration auto-creates a row with metadata (title, date, etc.)
+    → Make.com sees meeting completed, fires repository_dispatch with the meeting ID
+    → THIS SCRIPT fetches the full transcript from Fireflies, finds the matching row,
+      and fills in the Full Transcript field
+    → Notion Agent fires on Full Transcript fill, dispatches per-Transaction notes
+
+Why update instead of create: the Fireflies-Notion integration is already creating one
+row per meeting with all the metadata. Creating a second row would cause duplicates.
+Our job is just to populate the one field the integration can't fill (the transcript).
 
 Stdlib only — no pip installs.
 """
@@ -15,7 +21,7 @@ Stdlib only — no pip installs.
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -31,13 +37,18 @@ INBOX_DATABASE_ID = os.environ["FIREFLIES_INBOX_DATABASE_ID"]
 MEETING_ID = os.environ.get("MEETING_ID", "").strip()
 
 # Property names on the Notion inbox database. Override via env if your column names differ.
-PROP_TITLE       = os.environ.get("PROP_TITLE",       "Name")
-PROP_TRANSCRIPT  = os.environ.get("PROP_TRANSCRIPT",  "Full Transcript")
-PROP_MEETING_ID  = os.environ.get("PROP_MEETING_ID",  "Fireflies ID")
-PROP_DATE        = os.environ.get("PROP_DATE",        "Meeting Date")
-PROP_DURATION    = os.environ.get("PROP_DURATION",    "Duration")
-PROP_HOST        = os.environ.get("PROP_HOST",        "Host")
-PROP_URL         = os.environ.get("PROP_URL",         "Fireflies URL")
+PROP_TITLE      = os.environ.get("PROP_TITLE",      "Title")
+PROP_TRANSCRIPT = os.environ.get("PROP_TRANSCRIPT", "Full Transcript")
+PROP_MEETING_ID = os.environ.get("PROP_MEETING_ID", "Fireflies ID")
+PROP_DATE       = os.environ.get("PROP_DATE",       "Date")
+
+# The Fireflies-Notion integration adds " (Fireflies)" to the end of every meeting title.
+# We construct the expected Notion title by appending this to the raw Fireflies title.
+NOTION_TITLE_SUFFIX = " (Fireflies)"
+
+# When matching by title + date, allow this much clock drift between Fireflies meeting
+# time and the timestamp the Notion integration recorded.
+DATE_MATCH_WINDOW_MIN = 15
 
 # Notion has a hard limit of 2000 characters per rich_text element. We split longer
 # transcripts into multiple chunks and pass them as a list of rich_text elements.
@@ -78,7 +89,7 @@ def fireflies_query(query, variables=None):
 
 
 def fetch_meeting(meeting_id):
-    """Fetch a Fireflies transcript including sentences, attendees, host, date, etc."""
+    """Fetch a Fireflies transcript including sentences, title, date, etc."""
     query = """
     query Transcript($id: String!) {
       transcript(id: $id) {
@@ -87,10 +98,6 @@ def fetch_meeting(meeting_id):
         date
         duration
         transcript_url
-        host_email
-        organizer_email
-        participants
-        meeting_attendees { displayName email }
         sentences { text speaker_name }
       }
     }
@@ -103,7 +110,7 @@ def fetch_meeting(meeting_id):
 
 
 def assemble_transcript(transcript):
-    """Join all sentences into one big block of text, with speaker labels."""
+    """Join all sentences into one block of text, with speaker labels on speaker change."""
     sentences = transcript.get("sentences") or []
     if not sentences:
         return ""
@@ -121,16 +128,15 @@ def assemble_transcript(transcript):
     return " ".join(lines).strip()
 
 
-def fireflies_date_to_iso(ts):
-    """Fireflies returns date as a unix epoch in milliseconds. Convert to ISO."""
+def fireflies_date_to_dt(ts):
+    """Fireflies returns date as a unix epoch in milliseconds. Convert to datetime."""
     if ts is None:
         return None
     try:
         ts = int(ts)
-        # Heuristic: if value looks like ms, divide
-        if ts > 10**12:
+        if ts > 10**12:  # ms
             ts = ts / 1000
-        return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+        return datetime.fromtimestamp(ts, tz=timezone.utc)
     except Exception:
         return None
 
@@ -146,13 +152,10 @@ def notion_request(method, path, body=None):
     return http_request(method, f"{NOTION_BASE}{path}", headers, body)
 
 
-def find_existing_row(meeting_id):
-    """Return the page object if a row with this Fireflies ID already exists. Else None."""
+def find_row_by_meeting_id(meeting_id):
+    """If we've previously stamped a row with this Fireflies ID, find it directly."""
     body = {
-        "filter": {
-            "property": PROP_MEETING_ID,
-            "rich_text": {"equals": meeting_id},
-        },
+        "filter": {"property": PROP_MEETING_ID, "rich_text": {"equals": meeting_id}},
         "page_size": 1,
     }
     try:
@@ -160,141 +163,145 @@ def find_existing_row(meeting_id):
         results = resp.get("results", [])
         return results[0] if results else None
     except HTTPError as e:
-        # If the meeting-id property doesn't exist or has the wrong type, fall through —
-        # we'd rather risk a duplicate than fail to ingest.
-        print(f"  WARNING: dedupe query failed ({e}); proceeding without dedupe", file=sys.stderr)
+        print(f"  WARNING: Fireflies-ID query failed ({e})", file=sys.stderr)
         return None
 
 
-# Window for near-duplicate detection. When the same meeting has multiple Fireflies
-# notetakers attending, you get two transcripts with DIFFERENT IDs but the SAME title
-# and near-identical timestamps. We catch those by looking for rows with the same
-# title whose date is within NEAR_DUPLICATE_WINDOW_MIN minutes of this meeting's start.
-NEAR_DUPLICATE_WINDOW_MIN = 5
+def find_row_by_title_and_date(notion_title, meeting_dt):
+    """Find a Notion row matching the expected title + date window.
 
-def find_near_duplicate(title, iso_date):
-    """Return an existing page if there's a row with the same Title within the ±5 min
-    window of `iso_date`. Used to skip duplicates from multiple Fireflies notetakers
-    in the same meeting."""
-    if not title or not iso_date:
-        return None
-    try:
-        # Build the window: meeting time ± NEAR_DUPLICATE_WINDOW_MIN minutes.
-        center = datetime.fromisoformat(iso_date.replace("Z", "+00:00"))
-        from datetime import timedelta
-        before = (center + timedelta(minutes=NEAR_DUPLICATE_WINDOW_MIN)).isoformat()
-        after = (center - timedelta(minutes=NEAR_DUPLICATE_WINDOW_MIN)).isoformat()
-    except Exception as e:
-        print(f"  WARNING: couldn't parse date for near-dup check ({e})", file=sys.stderr)
+    Returns the best match: a row with the matching title whose Date falls within
+    +/-DATE_MATCH_WINDOW_MIN of the meeting time. If multiple match, prefer the one
+    where Full Transcript is empty (most likely the row Fireflies just created).
+    """
+    if not meeting_dt:
+        print(f"  WARNING: meeting_dt is None — can't do date-windowed match", file=sys.stderr)
         return None
 
+    after = (meeting_dt - timedelta(minutes=DATE_MATCH_WINDOW_MIN)).isoformat()
+    before = (meeting_dt + timedelta(minutes=DATE_MATCH_WINDOW_MIN)).isoformat()
     body = {
         "filter": {
             "and": [
-                {"property": PROP_TITLE, "title": {"equals": title}},
+                {"property": PROP_TITLE, "title": {"equals": notion_title}},
                 {"property": PROP_DATE, "date": {"on_or_after": after}},
                 {"property": PROP_DATE, "date": {"on_or_before": before}},
             ]
         },
-        "page_size": 1,
+        "page_size": 10,
     }
     try:
         resp = notion_request("POST", f"/databases/{INBOX_DATABASE_ID}/query", body)
         results = resp.get("results", [])
-        return results[0] if results else None
     except HTTPError as e:
-        print(f"  WARNING: near-duplicate query failed ({e}); proceeding without that check", file=sys.stderr)
+        print(f"  ERROR: title+date query failed ({e})", file=sys.stderr)
         return None
+
+    if not results:
+        return None
+
+    # Prefer rows where Full Transcript is empty — that's the row that needs filling.
+    def transcript_is_empty(page):
+        prop = page.get("properties", {}).get(PROP_TRANSCRIPT, {})
+        rt = prop.get("rich_text") or []
+        return all(not (r.get("plain_text") or "").strip() for r in rt)
+
+    empty_first = sorted(results, key=lambda p: (0 if transcript_is_empty(p) else 1))
+    return empty_first[0]
+
+
+def get_existing_transcript_text(page):
+    """Return the current Full Transcript content (joined plain_text) for an existing row."""
+    prop = page.get("properties", {}).get(PROP_TRANSCRIPT, {})
+    rt = prop.get("rich_text") or []
+    return "".join((r.get("plain_text") or "") for r in rt).strip()
 
 
 def chunk_text(text, size=NOTION_RICH_TEXT_CHUNK):
-    """Split text into <=size character chunks for Notion rich_text array."""
     if not text:
         return [""]
     return [text[i:i + size] for i in range(0, len(text), size)]
 
 
 def rich_text_array(text):
-    """Convert long text into a list of {type:'text', text:{content:...}} chunks."""
     return [{"type": "text", "text": {"content": chunk}} for chunk in chunk_text(text)]
 
 
-def build_properties(transcript, full_text):
-    """Assemble the Notion property payload. Empty values are omitted, not nulled."""
-    props = {}
-
-    title = transcript.get("title") or f"Meeting {transcript.get('id')}"
-    props[PROP_TITLE] = {"title": [{"type": "text", "text": {"content": title[:2000]}}]}
-
-    if full_text:
-        props[PROP_TRANSCRIPT] = {"rich_text": rich_text_array(full_text)}
-
-    props[PROP_MEETING_ID] = {"rich_text": [{"type": "text", "text": {"content": transcript["id"]}}]}
-
-    iso_date = fireflies_date_to_iso(transcript.get("date"))
-    if iso_date:
-        props[PROP_DATE] = {"date": {"start": iso_date}}
-
-    duration = transcript.get("duration")
-    if PROP_DURATION and isinstance(duration, (int, float)):
-        props[PROP_DURATION] = {"number": float(duration)}
-
-    host = transcript.get("organizer_email") or transcript.get("host_email")
-    if host:
-        props[PROP_HOST] = {"rich_text": [{"type": "text", "text": {"content": host}}]}
-
-    url = transcript.get("transcript_url")
-    if url:
-        props[PROP_URL] = {"url": url}
-
-    return props
-
-
-def create_row(transcript, full_text):
+def update_row(page_id, full_text, meeting_id):
+    """Patch the Full Transcript and Fireflies ID properties on an existing row."""
     body = {
-        "parent": {"database_id": INBOX_DATABASE_ID},
-        "properties": build_properties(transcript, full_text),
+        "properties": {
+            PROP_TRANSCRIPT: {"rich_text": rich_text_array(full_text)},
+            PROP_MEETING_ID: {"rich_text": [{"type": "text", "text": {"content": meeting_id}}]},
+        }
     }
-    resp = notion_request("POST", "/pages", body)
-    return resp
+    return notion_request("PATCH", f"/pages/{page_id}", body)
 
 
 # ---------- Main ----------
 
 def main():
     if not MEETING_ID:
-        print("ERROR: MEETING_ID env var is empty. Make.com should pass it via repository_dispatch payload.", file=sys.stderr)
+        print("ERROR: MEETING_ID env var is empty.", file=sys.stderr)
         sys.exit(1)
 
     print(f"Ingesting Fireflies meeting {MEETING_ID}", file=sys.stderr)
 
-    # Layer 1: exact Fireflies ID match — catches retries of the same notetaker
-    existing = find_existing_row(MEETING_ID)
-    if existing:
-        print(f"  Already in Notion (page {existing['id']}) — skipping (Fireflies ID match).", file=sys.stderr)
-        return
+    # Fast path: have we stamped this Fireflies ID into a row before?
+    by_id = find_row_by_meeting_id(MEETING_ID)
+    if by_id:
+        existing_text = get_existing_transcript_text(by_id)
+        if existing_text:
+            print(f"  Row {by_id['id']} already has Full Transcript ({len(existing_text)} chars) — skipping.", file=sys.stderr)
+            return
+        # Row exists but transcript empty → fall through to fetch and update
 
+    # Fetch transcript from Fireflies
     transcript = fetch_meeting(MEETING_ID)
+    raw_title = (transcript.get("title") or "").strip()
+    notion_title = raw_title + NOTION_TITLE_SUFFIX
+    meeting_dt = fireflies_date_to_dt(transcript.get("date"))
     full_text = assemble_transcript(transcript)
-    title = transcript.get("title") or f"Meeting {transcript['id']}"
-    iso_date = fireflies_date_to_iso(transcript.get("date"))
-    print(f"  Title: {title!r}", file=sys.stderr)
-    print(f"  Date: {iso_date}", file=sys.stderr)
+    print(f"  Fireflies title: {raw_title!r}", file=sys.stderr)
+    print(f"  Looking for Notion row titled: {notion_title!r}", file=sys.stderr)
+    print(f"  Meeting time: {meeting_dt.isoformat() if meeting_dt else '<unknown>'}", file=sys.stderr)
     print(f"  Sentences: {len(transcript.get('sentences') or [])}, transcript chars: {len(full_text)}", file=sys.stderr)
 
-    # Layer 2: same title + date within ±5 min — catches duplicate notetakers in the same meeting
-    near_dup = find_near_duplicate(title, iso_date)
-    if near_dup:
-        print(f"  Near-duplicate found (page {near_dup['id']}) — same title within ±{NEAR_DUPLICATE_WINDOW_MIN} min. Skipping.", file=sys.stderr)
+    # If we already found the row by Fireflies ID, use that. Otherwise search by title+date.
+    target = by_id or find_row_by_title_and_date(notion_title, meeting_dt)
+    if not target:
+        print(f"  ERROR: no matching Notion row found for {notion_title!r} within +/-{DATE_MATCH_WINDOW_MIN}min", file=sys.stderr)
+        print(f"  This usually means the Fireflies-Notion integration hasn't created the row yet.", file=sys.stderr)
+        print(f"  Make sure the Fireflies integration runs first, or wait a minute and re-trigger this workflow.", file=sys.stderr)
+        sys.exit(2)
+
+    # Idempotency: if the matched row already has a transcript, skip
+    existing_text = get_existing_transcript_text(target)
+    if existing_text:
+        print(f"  Matched row {target['id']} already has Full Transcript ({len(existing_text)} chars) — skipping.", file=sys.stderr)
+        # Still stamp the Fireflies ID so future runs can find it directly
+        try:
+            notion_request("PATCH", f"/pages/{target['id']}", {
+                "properties": {PROP_MEETING_ID: {"rich_text": [{"type": "text", "text": {"content": MEETING_ID}}]}}
+            })
+            print(f"  (stamped Fireflies ID for future lookups)", file=sys.stderr)
+        except Exception as e:
+            print(f"  (couldn't stamp Fireflies ID: {e})", file=sys.stderr)
         return
 
-    page = create_row(transcript, full_text)
-    print(f"  Created Notion page {page['id']} — agent should fire shortly.", file=sys.stderr)
+    if not full_text:
+        print(f"  WARNING: Fireflies returned an empty transcript — not updating Notion.", file=sys.stderr)
+        sys.exit(3)
+
+    update_row(target["id"], full_text, MEETING_ID)
+    print(f"  Updated Notion row {target['id']} with {len(full_text)} chars of transcript — agent should fire shortly.", file=sys.stderr)
 
 
 if __name__ == "__main__":
     try:
         main()
+    except SystemExit:
+        raise
     except Exception as e:
         print(f"FAILED: {e}", file=sys.stderr)
         sys.exit(1)
