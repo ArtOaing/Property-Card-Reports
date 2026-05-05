@@ -1485,7 +1485,7 @@ function showCard(id) {
           const milestones = [
             { pct: 0, color: 'var(--green-border)', label: 'Contracted', date: fmtShort(contractDate), above: false },
             ...(pricedMilestone ? [pricedMilestone] : []),
-            ...(listedMilestone ? [{ ...listedMilestone, above: pricedMilestone ? false : listedMilestone.above }] : []),
+            ...(listedMilestone ? [listedMilestone] : []),
             ...realDrops.map((d, i) => ({
               pct: pct(d.date.getTime()),
               color: 'var(--amber-border)',
