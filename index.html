@@ -1745,32 +1745,44 @@ function showCard(id) {
 
           // Collision-aware lane assignment.
           // Each label is ~80px wide. With a 1100px-ish bar, that's ~7% of bar per label.
-          // We use 6% as the collision threshold. Lanes 0/1/2 stack above, lanes 0/1/2 stack below.
+          // We use 8% as the base collision threshold; pinned end markers (Today/Expires)
+          // get a wider 12% gap because their full date strings are noticeably longer.
+          // Lanes 0/1/2 stack above, lanes 0/1/2 stack below.
           // Today and Expires are pinned to lane 0 (closest to bar) so they read first.
-          const COLLISION_PCT = 6;
-          const aboveLanes = [];  // each lane is array of milestone indices
+          const COLLISION_PCT = 8;
+          const PINNED_COLLISION_PCT = 12;
+          const aboveLanes = [];  // each lane is array of milestones in that lane
           const belowLanes = [];
 
           // Clone & sort by pct so collision check walks left-to-right
           const ordered = milestones.map((m, i) => ({ m, originalIdx: i })).sort((a, b) => a.m.pct - b.m.pct);
 
-          for (const { m, originalIdx } of ordered) {
-            // Pinned milestones stay on their original side, lane 0
+          // Pass 1: PIN. Today / Expires / Contracted always claim lane 0 on their preferred side.
+          // Placing them first means later items see them as occupants and route around.
+          for (const { m } of ordered) {
             if (m.isToday || m.isEnd || m.label === 'Contracted') {
               m.lane = 0;
               const lanes = m.above ? aboveLanes : belowLanes;
               if (!lanes[0]) lanes[0] = [];
               lanes[0].push(m);
-              continue;
             }
-            // Try original side first (preserves the alternating pattern when there's room)
+          }
+
+          // Pass 2: FILL. Every other milestone finds the first non-colliding lane,
+          // checking its preferred side first, then the opposite side.
+          for (const { m } of ordered) {
+            if (m.isToday || m.isEnd || m.label === 'Contracted') continue;
             const tryOrder = m.above ? ['above', 'below'] : ['below', 'above'];
             let placed = false;
             for (const side of tryOrder) {
               const lanes = side === 'above' ? aboveLanes : belowLanes;
               for (let lane = 0; lane < 3; lane++) {
                 const existing = lanes[lane] || [];
-                const collides = existing.some(other => Math.abs(other.pct - m.pct) < COLLISION_PCT);
+                // Pinned end markers carry wider labels — give them more breathing room
+                const collides = existing.some(other => {
+                  const minDist = (other.isEnd || other.isToday) ? PINNED_COLLISION_PCT : COLLISION_PCT;
+                  return Math.abs(other.pct - m.pct) < minDist;
+                });
                 if (!collides) {
                   if (!lanes[lane]) lanes[lane] = [];
                   lanes[lane].push(m);
@@ -1791,8 +1803,10 @@ function showCard(id) {
             }
           }
 
-          // Lane heights — each lane needs ~38px to fit price + sublabel + date stacked (3 lines @ 12px line-height)
-          const LANE_HEIGHT = 38;
+          // Lane heights — each lane needs to fit label + sublabel + date stacked.
+          // At 13px font with line-height 1.4 that's 3 × ~18.2px ≈ 55px of text per label,
+          // so LANE_HEIGHT must be at least that to keep adjacent lanes from overlapping.
+          const LANE_HEIGHT = 60;
           const BAR_GAP = 6; // gap between bar edge and innermost label
 
           const dotHtml = m => {
@@ -1808,8 +1822,8 @@ function showCard(id) {
                     ? `<div style="width:10px;height:10px;border-radius:50%;background:var(--amber-border);border:2px solid var(--bg)"></div>`
                     : `<div style="width:12px;height:12px;border-radius:50%;background:${m.color};border:2px solid var(--bg)"></div>`}
               <div style="position:absolute;${m.above ? 'bottom:' + labelOffset + 'px' : 'top:' + (labelOffset + 16) + 'px'};${m.isEnd ? 'right:0;text-align:right' : 'left:50%;transform:translateX(-50%);text-align:center'};white-space:nowrap;line-height:1.4">
-                <div style="font-size:12px;font-weight:${m.isToday ? '700' : '600'};color:${m.isToday ? m.color : m.isOriginal ? 'var(--blue-text)' : m.isPriceDrop ? 'var(--amber-text)' : m.isTitle ? 'var(--teal-text)' : m.isMls ? 'var(--green-text)' : 'var(--text3)'};text-transform:uppercase;letter-spacing:0.04em">${m.label}</div>
-                ${m.sublabel ? `<div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;margin-top:1px">${m.sublabel}</div>` : ''}
+                <div style="font-size:13px;font-weight:${m.isToday ? '700' : '600'};color:${m.isToday ? m.color : m.isOriginal ? 'var(--blue-text)' : m.isPriceDrop ? 'var(--amber-text)' : m.isTitle ? 'var(--teal-text)' : m.isMls ? 'var(--green-text)' : 'var(--text3)'};text-transform:uppercase;letter-spacing:0.04em">${m.label}</div>
+                ${m.sublabel ? `<div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;margin-top:1px">${m.sublabel}</div>` : ''}
                 <div style="font-size:13px;color:${m.label === 'Expires' && daysLeft < 15 ? 'var(--red-text)' : 'var(--text2)'}">${m.date}</div>
               </div>
             </div>`;
