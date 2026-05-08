@@ -551,6 +551,8 @@ function parseRow(row) {
     daysDrop: n(gv(row, '# of Days from Last Price Update')), dropDate: gv(row, 'Price Drop Date') || '',
     contractDate: gv(row, 'Seller Contract Signed Date') || '', daysUnder: n(gv(row, 'Days Under Contract')),
     dd: gv(row, 'Property DD Status') || '', title: gv(row, 'Title Status') || '',
+    titleCommit: gv(row, 'Title Commitment Status', 'Title Commit Status', 'Title Commit. Status') || '',
+    titleCommitDate: gv(row, 'Title Commit. Received Date', 'Title Commitment Received Date', 'Title Commit Received Date') || '',
     listingStatus: gv(row, 'Listing Status') || '',
     mls: b(gv(row, 'Listed on MLS')), fb: b(gv(row, 'Listed on FB?')),
     neighbor: b(gv(row, 'Neighbor Campaign Complete', 'Neighbor Campaign')), drone: b(gv(row, 'Drone')), ground: b(gv(row, 'Ground Photo')),
@@ -856,25 +858,18 @@ function calcExposure(l, lc, ol) {
                       ol.some(r => (r['Campaign Objective'] || '').toLowerCase().includes('neighbor')) ||
                       dispoMatches('neighbor');
 
-  if (l.mls) {
-    let score = 35;
-    if (l.fb) score += 15;
-    if (hasRealtor) score += 15;
-    if (hasInvestor) score += 10;
-    if (hasBuyer) score += 10;
-    if (hasNeighbor) score += 10;
-    if (l.signBoards) score += 5;
-    return score;
-  } else {
-    let score = 0;
-    if (l.fb) score += 25;
-    if (hasRealtor) score += 25;
-    if (hasInvestor) score += 17;
-    if (hasBuyer) score += 17;
-    if (hasNeighbor) score += 11;
-    if (l.signBoards) score += 5;
-    return score;
-  }
+  // MLS is always a permanent slot in the LEI formula. Even if the property cannot
+  // currently be listed on MLS, the team can buy and flip to get on MLS, so the
+  // slot stays in the formula and contributes 0 when inactive (no rebalancing).
+  let score = 0;
+  if (l.mls) score += 35;
+  if (l.fb) score += 15;
+  if (hasRealtor) score += 15;
+  if (hasInvestor) score += 10;
+  if (hasBuyer) score += 10;
+  if (hasNeighbor) score += 10;
+  if (l.signBoards) score += 5;
+  return score;
 }
 
 function calcScore(l) {
@@ -1327,8 +1322,8 @@ function showCard(id) {
           <button onclick="closeCard()" title="Close card (Esc)" style="position:sticky;top:60px;font-size:14px;font-weight:600;color:var(--text2);background:var(--bg2);border:1px solid var(--border2);width:32px;height:32px;border-radius:var(--r-md);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin-left:4px;z-index:10" onmouseover="this.style.background='var(--red-bg)';this.style.color='var(--red-text)';this.style.borderColor='var(--red-border)'" onmouseout="this.style.background='var(--bg2)';this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">✕</button>
         </div>
       </div>
-      <!-- Row 2: Address / State / County -->
-      <div style="display:flex;gap:40px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
+      <!-- Row 2: Size / Address / State / County  (grid spreads evenly across full width; address gets extra room) -->
+      <div style="display:grid;grid-template-columns:1fr 2fr 1fr 1fr;gap:24px;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
         <div>
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Size</div>
           <div style="font-size:13px;font-weight:500;color:var(--text)">${l.size || '—'}</div>
@@ -1346,8 +1341,8 @@ function showCard(id) {
           <div style="font-size:13px;font-weight:500;color:var(--text)">${l.county}</div>
         </div>
       </div>
-      <!-- Row 3: Property Type / CPI / LDS -->
-      <div style="display:flex;gap:40px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
+      <!-- Row 3: Property Type / CPI / LDS  (grid spreads evenly across full width) -->
+      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:24px;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
         <div>
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property Type</div>
           <div style="font-size:13px;font-weight:500;color:var(--text)">${l.type || '—'}</div>
@@ -1361,11 +1356,39 @@ function showCard(id) {
           <div style="font-size:13px;font-weight:500;color:var(--text)">${l.lds !== null ? l.lds : '—'}</div>
         </div>
       </div>
-      <!-- Row 4: Transaction # / Type of Deal / Title Status / Stage / POD -->
-      <div style="display:flex;gap:40px;flex-wrap:wrap">
+      <!-- Row 4: Transaction # / Type of Deal / Title Status / Title Commitment / Stage / POD  (grid spreads evenly across full width) -->
+      ${(() => {
+        // Title Commitment Status + days pending
+        // Per spec: if status is "Awaiting Commit.", days = today - Seller Contract Signed Date.
+        //          if commitment already received, days = 0.
+        const tcRaw = (l.titleCommit || '').trim();
+        const isAwaiting = tcRaw && tcRaw.toLowerCase().includes('await');
+        let tcDaysPending = null;
+        if (tcRaw) {
+          if (isAwaiting) {
+            if (l.contractDate) {
+              const cd = new Date(l.contractDate);
+              if (!isNaN(cd)) tcDaysPending = Math.max(0, Math.round((new Date() - cd) / 86400000));
+            }
+          } else {
+            // Not awaiting → treat as received per spec
+            tcDaysPending = 0;
+          }
+        }
+        const tcBadgeClass = isAwaiting
+          ? (tcDaysPending !== null && tcDaysPending > 45 ? 'b-r' : 'b-a')
+          : (tcRaw ? 'b-g' : 'b-gr');
+        const tcLabel = tcRaw || '—';
+        const tcSub = tcDaysPending !== null
+          ? (tcDaysPending === 0
+              ? '<div style="font-size:10px;color:var(--green-text);margin-top:4px">0 days pending</div>'
+              : `<div style="font-size:10px;color:${tcDaysPending > 45 ? 'var(--red-text)' : tcDaysPending > 21 ? 'var(--amber-text)' : 'var(--text2)'};margin-top:4px">${tcDaysPending} days pending</div>`)
+          : '';
+        return `
+      <div style="display:grid;grid-template-columns:repeat(6, 1fr);gap:24px">
         <div>
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Transaction #</div>
-          <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             ${l.txnLink
               ? `<a href="${l.txnLink}" target="_blank" style="font-size:13px;font-weight:500;color:var(--blue-text);text-decoration:none">${l.txn || '—'}</a>`
               : `<div style="font-size:13px;font-weight:500;color:var(--text)">${l.txn || '—'}</div>`}
@@ -1381,6 +1404,11 @@ function showCard(id) {
           <div><span class="badge ${l.title === 'Unprocessed' ? 'b-r' : l.title && l.title.includes('Complex') ? 'b-a' : 'b-g'}">${l.title || '—'}</span></div>
         </div>
         <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Title Commitment</div>
+          <div><span class="badge ${tcBadgeClass}">${tcLabel}</span></div>
+          ${tcSub}
+        </div>
+        <div>
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Stage</div>
           <div><span class="badge ${stageClass(l.stage)}">${l.stage || '—'}</span></div>
         </div>
@@ -1388,7 +1416,8 @@ function showCard(id) {
           <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">POD</div>
           <div style="font-size:13px;font-weight:500;color:var(--text)">${l.pod || '—'}</div>
         </div>
-      </div>
+      </div>`;
+      })()}
     </div>
 
     <div class="card-body">
@@ -1503,11 +1532,18 @@ function showCard(id) {
             ? { pct: createdPct, color: 'var(--purple-border)', label: 'Priced', date: fmtShort(validCreated), above: true }
             : null;
 
+          // Title Commitment Received milestone — when Title Commit. Received Date is set
+          const titleCommitDateObj = l.titleCommitDate ? new Date(l.titleCommitDate) : null;
+          const titleCommitMilestone = (titleCommitDateObj && !isNaN(titleCommitDateObj.getTime()))
+            ? { pct: pct(titleCommitDateObj.getTime()), color: 'var(--teal-text)', label: 'Title Received', date: fmtShort(titleCommitDateObj), above: false, isTitle: true }
+            : null;
+
           // Build milestones — first pass assigns alternating above/below, then we run a collision detector
           // to push overlapping labels into multiple lanes (up to 3 above, 3 below).
           const dropOffset = (listedMilestone ? 1 : 0) + (pricedMilestone ? 1 : 0);
           const milestones = [
             { pct: 0, color: 'var(--green-border)', label: 'Contracted', date: fmtShort(contractDate), above: false },
+            ...(titleCommitMilestone ? [titleCommitMilestone] : []),
             ...(pricedMilestone ? [pricedMilestone] : []),
             ...(listedMilestone ? [listedMilestone] : []),
             ...realDrops.map((d, i) => ({
@@ -1588,7 +1624,7 @@ function showCard(id) {
                     ? `<div style="width:10px;height:10px;border-radius:50%;background:var(--amber-border);border:2px solid var(--bg)"></div>`
                     : `<div style="width:12px;height:12px;border-radius:50%;background:${m.color};border:2px solid var(--bg)"></div>`}
               <div style="position:absolute;${m.above ? 'bottom:' + labelOffset + 'px' : 'top:' + (labelOffset + 16) + 'px'};${m.isEnd ? 'right:0;text-align:right' : 'left:50%;transform:translateX(-50%);text-align:center'};white-space:nowrap;line-height:1.4">
-                <div style="font-size:9px;font-weight:${m.isToday ? '700' : '600'};color:${m.isToday ? m.color : m.isOriginal ? 'var(--blue-text)' : m.isPriceDrop ? 'var(--amber-text)' : 'var(--text3)'};text-transform:uppercase;letter-spacing:0.04em">${m.label}</div>
+                <div style="font-size:9px;font-weight:${m.isToday ? '700' : '600'};color:${m.isToday ? m.color : m.isOriginal ? 'var(--blue-text)' : m.isPriceDrop ? 'var(--amber-text)' : m.isTitle ? 'var(--teal-text)' : 'var(--text3)'};text-transform:uppercase;letter-spacing:0.04em">${m.label}</div>
                 ${m.sublabel ? `<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;margin-top:1px">${m.sublabel}</div>` : ''}
                 <div style="font-size:10px;color:${m.label === 'Expires' && daysLeft < 15 ? 'var(--red-text)' : 'var(--text2)'}">${m.date}</div>
               </div>
@@ -1966,21 +2002,14 @@ function showCard(id) {
           const hasI = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('investor')) || ol.some(r => (r['Campaign Objective']||'').toLowerCase().includes('investor')) || dispoHas('investor');
           const hasB = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('buyer')) || ol.some(r => (r['Campaign Objective']||'').toLowerCase().includes('buyer')) || dispoHas('buyer');
           const hasN = lc.some(c => (c['Campaign type'] || c['Campaign Type'] || '').toLowerCase().includes('neighbor')) || ol.some(r => (r['Campaign Objective']||'').toLowerCase().includes('neighbor')) || dispoHas('neighbor');
-          const channels = l.mls ? [
-            { label: 'MLS', weight: 35, active: l.mls },
+          // MLS is permanent in the formula — always shown, contributes 35% when active, 0% otherwise.
+          const channels = [
+            { label: 'MLS', weight: 35, active: l.mls, note: l.mls ? null : 'Not listed' },
             { label: 'Facebook Marketplace', weight: 15, active: l.fb },
             { label: 'Realtor campaign', weight: 15, active: hasR },
             { label: 'Investor Base campaign', weight: 10, active: hasI },
             { label: 'Buyer Base campaign', weight: 10, active: hasB },
             { label: 'Neighbor campaign', weight: 10, active: hasN },
-            { label: 'Sign boards', weight: 5, active: l.signBoards },
-          ] : [
-            { label: 'MLS', weight: 0, active: false, note: 'Not listed' },
-            { label: 'Facebook Marketplace', weight: 25, active: l.fb },
-            { label: 'Realtor campaign', weight: 25, active: hasR },
-            { label: 'Investor Base campaign', weight: 17, active: hasI },
-            { label: 'Buyer Base campaign', weight: 17, active: hasB },
-            { label: 'Neighbor campaign', weight: 11, active: hasN },
             { label: 'Sign boards', weight: 5, active: l.signBoards },
           ];
           return `
