@@ -524,6 +524,27 @@ function escapeHtml(s) {
   );
 }
 
+// Resolve a Notion URL for a given Transaction #.
+//
+// 1. If meetings.json has a direct entry for this transaction (synced from Notion via the
+//    GitHub workflow), return that exact page URL — it deep-links to the specific Notion page.
+// 2. Otherwise, use the top-level `databaseId` from meetings.json to build a database URL
+//    with the Transaction # as a search query. This works for every transaction even if the
+//    sync hasn't picked it up yet (e.g., new transactions, or ones with no meetings logged).
+// 3. If meetings.json is missing entirely, return null and the buttons hide.
+function getNotionUrlForTxn(txn) {
+  if (!txn || !meetingsData) return null;
+  // 1. Direct match — synced page URL
+  const direct = meetingsData.byTransaction && meetingsData.byTransaction[txn];
+  if (direct && direct.notionUrl) return direct.notionUrl;
+  // 2. Database fallback — open the Notion DB with a search query for this Transaction #
+  if (meetingsData.databaseId) {
+    const dbId = String(meetingsData.databaseId).replace(/-/g, '');
+    return 'https://www.notion.so/' + dbId + '?q=' + encodeURIComponent(txn);
+  }
+  return null;
+}
+
 function setDot(id, state) {
   const el = document.getElementById('dot-' + id);
   if (el) el.className = 'loader-dot ' + state;
@@ -1480,9 +1501,7 @@ function showCard(id) {
                 : `<div style="font-size:22px;font-weight:700;color:var(--text);line-height:1">${l.txn || '—'}</div>`}
               ${l.txn ? `<a href="#" style="font-size:15px;color:var(--text3);text-decoration:none;padding:2px 8px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg2)" title="Open in Salesforce">SF ↗</a>` : ''}
               ${(() => {
-                // Notion deep-link sourced from meetingsData synced via GitHub workflow.
-                // Each transaction has its Notion page URL keyed by Transaction # in meetingsData.byTransaction.
-                const notionUrl = (l.txn && meetingsData && meetingsData.byTransaction && meetingsData.byTransaction[l.txn] && meetingsData.byTransaction[l.txn].notionUrl) || '';
+                const notionUrl = getNotionUrlForTxn(l.txn);
                 return notionUrl
                   ? `<a href="${notionUrl}" target="_blank" style="font-size:15px;color:var(--text3);text-decoration:none;padding:2px 8px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg2)" title="Open in Notion" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text2)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border2)'">Notion ↗</a>`
                   : '';
@@ -1492,7 +1511,7 @@ function showCard(id) {
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
           ${(() => {
-            const notionUrl = (l.txn && meetingsData && meetingsData.byTransaction && meetingsData.byTransaction[l.txn] && meetingsData.byTransaction[l.txn].notionUrl) || '';
+            const notionUrl = getNotionUrlForTxn(l.txn);
             return notionUrl
               ? `<a href="${notionUrl}" target="_blank" style="font-size:16px;font-weight:600;color:var(--text2);text-decoration:none;padding:6px 14px;border-radius:var(--r-md);border:1px solid var(--border2);background:var(--bg2);white-space:nowrap" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text2)'" onmouseout="this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">Notion ↗</a>`
               : '';
