@@ -378,6 +378,8 @@
           <div class="dd-panel" id="listingStatusDropdownPanel"></div>
         </div>
       </div>
+      <!-- Force a wrap to the next row so we get exactly 5 filters per row -->
+      <div style="flex-basis:100%;height:0;margin:0;padding:0"></div>
       <!-- Expiry — single-select -->
       <div class="ff">
         <span class="filter-label">Expiry</span>
@@ -1524,16 +1526,8 @@ function showCard(id) {
           <button onclick="closeCard()" title="Close card (Esc)" style="position:sticky;top:60px;font-size:18px;font-weight:600;color:var(--text2);background:var(--bg2);border:1px solid var(--border2);width:32px;height:32px;border-radius:var(--r-md);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin-left:4px;z-index:10" onmouseover="this.style.background='var(--red-bg)';this.style.color='var(--red-text)';this.style.borderColor='var(--red-border)'" onmouseout="this.style.background='var(--bg2)';this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">✕</button>
         </div>
       </div>
-      <!-- Row A: Size / Property Address / State / County / Property Type / CPI / LDS  (7 cols, custom widths to fit long content) -->
-      <div style="display:grid;grid-template-columns:1fr 2fr 1fr 1fr 2fr 1fr 1fr;gap:24px;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
-        <div>
-          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Size</div>
-          <div style="font-size:18px;font-weight:500;color:var(--text)">${l.size || '—'}</div>
-        </div>
-        <div>
-          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property Address</div>
-          <div style="font-size:18px;font-weight:500;color:var(--text)">${l.addr}</div>
-        </div>
+      <!-- Row 1: State / County / Property Address / Size / CPI / LDS  (6 cols; col 3 is 2× wide for the long address) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 2fr 1fr 1fr 1fr;gap:24px;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
         <div>
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">State</div>
           <div style="font-size:18px;font-weight:500;color:var(--text)">${l.state}</div>
@@ -1543,8 +1537,12 @@ function showCard(id) {
           <div style="font-size:18px;font-weight:500;color:var(--text)">${l.county}</div>
         </div>
         <div>
-          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property Type</div>
-          <div style="font-size:18px;font-weight:500;color:var(--text)">${l.type || '—'}</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property Address</div>
+          <div style="font-size:18px;font-weight:500;color:var(--text)">${l.addr}</div>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Size</div>
+          <div style="font-size:18px;font-weight:500;color:var(--text)">${l.size || '—'}</div>
         </div>
         <div>
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">CPI</div>
@@ -1555,7 +1553,7 @@ function showCard(id) {
           <div style="font-size:18px;font-weight:500;color:var(--text)">${l.lds !== null ? l.lds : '—'}</div>
         </div>
       </div>
-      <!-- Row 4: Type of Deal / Exit Strategy / Title Status / Title Commitment / Stage / POD  (6-col grid; Transaction # moved to Row 1) -->
+      <!-- Row 2: Stage / Type of Deal / Property Type / Title Commitment / Title Status / POD  (same 6-col template as Row 1; Exit Strategy removed) -->
       ${(() => {
         // Title Commitment Status + supporting label.
         // - If status is "Awaiting Commit.", show "{N} days pending" (today − Seller Contract Signed Date).
@@ -1591,18 +1589,18 @@ function showCard(id) {
             : `<div style="font-size:15px;color:${tcDaysPending > 45 ? 'var(--red-text)' : tcDaysPending > 21 ? 'var(--amber-text)' : 'var(--text2)'};margin-top:4px">${tcDaysPending} days pending</div>`;
         }
         return `
-      <div style="display:grid;grid-template-columns:1fr 2fr 1fr 1fr 2fr 1fr 1fr;gap:24px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 2fr 1fr 1fr 1fr;gap:24px">
+        <div>
+          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Stage</div>
+          <div><span class="badge ${stageClass(l.stage)}">${l.stage || '—'}</span></div>
+        </div>
         <div>
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Type of Deal</div>
           <div><span class="badge ${dealTypeClass(l.dealType)}">${l.dealType || '—'}</span></div>
         </div>
         <div>
-          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Exit Strategy</div>
-          <div><span class="badge ${exitStrategyClass(l.exitStrategy)}">${l.exitStrategy || '—'}</span></div>
-        </div>
-        <div>
-          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Title Status</div>
-          <div><span class="badge ${l.title === 'Unprocessed' ? 'b-r' : l.title && l.title.includes('Complex') ? 'b-a' : 'b-g'}">${l.title || '—'}</span></div>
+          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property Type</div>
+          <div style="font-size:18px;font-weight:500;color:var(--text)">${l.type || '—'}</div>
         </div>
         <div>
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Title Commitment</div>
@@ -1610,8 +1608,8 @@ function showCard(id) {
           ${tcSub}
         </div>
         <div>
-          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Stage</div>
-          <div><span class="badge ${stageClass(l.stage)}">${l.stage || '—'}</span></div>
+          <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Title Status</div>
+          <div><span class="badge ${l.title === 'Unprocessed' ? 'b-r' : l.title && l.title.includes('Complex') ? 'b-a' : 'b-g'}">${l.title || '—'}</span></div>
         </div>
         <div>
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">POD</div>
