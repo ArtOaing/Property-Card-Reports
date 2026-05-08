@@ -1500,12 +1500,6 @@ function showCard(id) {
                 ? `<a href="${l.txnLink}" target="_blank" style="font-size:22px;font-weight:700;color:var(--blue-text);line-height:1;text-decoration:none;">${l.txn || '—'}</a>`
                 : `<div style="font-size:22px;font-weight:700;color:var(--text);line-height:1">${l.txn || '—'}</div>`}
               ${l.txn ? `<a href="#" style="font-size:15px;color:var(--text3);text-decoration:none;padding:2px 8px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg2)" title="Open in Salesforce">SF ↗</a>` : ''}
-              ${(() => {
-                const notionUrl = getNotionUrlForTxn(l.txn);
-                return notionUrl
-                  ? `<a href="${notionUrl}" target="_blank" style="font-size:15px;color:var(--text3);text-decoration:none;padding:2px 8px;border-radius:4px;border:0.5px solid var(--border2);background:var(--bg2)" title="Open in Notion" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text2)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border2)'">Notion ↗</a>`
-                  : '';
-              })()}
             </div>
           </div>
         </div>
