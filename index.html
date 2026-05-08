@@ -1488,13 +1488,13 @@ function showCard(id) {
           <button onclick="closeCard()" title="Close card (Esc)" style="position:sticky;top:60px;font-size:18px;font-weight:600;color:var(--text2);background:var(--bg2);border:1px solid var(--border2);width:32px;height:32px;border-radius:var(--r-md);cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin-left:4px;z-index:10" onmouseover="this.style.background='var(--red-bg)';this.style.color='var(--red-text)';this.style.borderColor='var(--red-border)'" onmouseout="this.style.background='var(--bg2)';this.style.color='var(--text2)';this.style.borderColor='var(--border2)'">✕</button>
         </div>
       </div>
-      <!-- Row 2: Size / Address / State / County  (7-col grid; Address spans 2 cols for room; left-aligned) -->
-      <div style="display:grid;grid-template-columns:repeat(7, 1fr);gap:24px;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
+      <!-- Row A: Size / Property Address / State / County / Property Type / CPI / LDS  (7 cols, custom widths to fit long content) -->
+      <div style="display:grid;grid-template-columns:1fr 2fr 1fr 1fr 2fr 1fr 1fr;gap:24px;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
         <div>
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Size</div>
           <div style="font-size:18px;font-weight:500;color:var(--text)">${l.size || '—'}</div>
         </div>
-        <div style="grid-column:span 2">
+        <div>
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property Address</div>
           <div style="font-size:18px;font-weight:500;color:var(--text)">${l.addr}</div>
         </div>
@@ -1506,10 +1506,7 @@ function showCard(id) {
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">County</div>
           <div style="font-size:18px;font-weight:500;color:var(--text)">${l.county}</div>
         </div>
-      </div>
-      <!-- Row 3: Property Type / CPI / LDS  (7-col grid; Property Type spans 2 cols for room; left-aligned) -->
-      <div style="display:grid;grid-template-columns:repeat(7, 1fr);gap:24px;margin-bottom:14px;padding-bottom:14px;border-bottom:0.5px solid var(--border)">
-        <div style="grid-column:span 2">
+        <div>
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Property Type</div>
           <div style="font-size:18px;font-weight:500;color:var(--text)">${l.type || '—'}</div>
         </div>
@@ -1558,7 +1555,7 @@ function showCard(id) {
             : `<div style="font-size:15px;color:${tcDaysPending > 45 ? 'var(--red-text)' : tcDaysPending > 21 ? 'var(--amber-text)' : 'var(--text2)'};margin-top:4px">${tcDaysPending} days pending</div>`;
         }
         return `
-      <div style="display:grid;grid-template-columns:repeat(7, 1fr);gap:24px">
+      <div style="display:grid;grid-template-columns:1fr 2fr 1fr 1fr 2fr 1fr 1fr;gap:24px">
         <div>
           <div style="font-size:15px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Type of Deal</div>
           <div><span class="badge ${dealTypeClass(l.dealType)}">${l.dealType || '—'}</span></div>
