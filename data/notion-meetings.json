@@ -1,5 +1,5 @@
 {
-  "lastSynced": "2026-05-11T19:56:31.059009+00:00",
+  "lastSynced": "2026-05-11T21:24:34.198443+00:00",
   "transactionPropertyName": "Transaction",
   "databaseId": "b90c1ecab1f9414cbf4792ac34126d00",
   "byTransaction": {
@@ -295,7 +295,8 @@
             "Price drop: → $86,900",
             "ACTION ITEMS",
             "Update listing price to $86,900 across channels — Ellyse Mae — Due: 2026-05-07",
-            "🎤 Source: https://app.fireflies.ai/view/01KQZ1N2JDG1V0QRR277CMCHYC"
+            "🎤 Source: https://app.fireflies.ai/view/01KQZ1N2JDG1V0QRR277CMCHYC",
+            "Property Timeline"
           ],
           "blockId": "52599dbc-9540-4397-bd3a-350c36c1572b"
         }
