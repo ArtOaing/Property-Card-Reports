@@ -77,7 +77,7 @@
   .sm-v.red { color: var(--red-text); } .sm-v.amber { color: var(--amber-text); } .sm-v.green { color: var(--green-text); }
 
   /* ── FILTERS ── */
-  .filter-bar { background: var(--bg); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 6px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+  .filter-bar { background: var(--bg); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 6px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
   .filter-section { background: var(--bg); border-radius: var(--r-md); padding: 10px 14px; margin-bottom: 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .filter-label { font-size:15px; color: var(--text); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 4px; font-weight: 700; }
   .filter-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
@@ -701,7 +701,7 @@ function parseRow(row) {
     marketHubLink: gv(row, 'The Market Hub Link', 'Property Link', 'property link', 'Market Hub Link') || '',
     ppp: gv(row, 'PPP: PPP Name') || '', cpi: gv(row, 'CPI') || '', lds: n(gv(row, 'LDS')),
     listP, contractP,
-    lastListP: n(gv(row, 'Last Cash List Price')), profit: (listP && contractP) ? (listP - contractP) : null,
+    lastListP: n(gv(row, 'Last Cash List Price')), profit: listP ? (contractP ? listP - contractP : listP) : null,
     equity: n(gv(row, 'Equity Capture')), pricePct: (() => { const v = gv(row, 'Price Drop %'); if (!v) return 0; const s = v.toString().replace('%','').trim(); return parseFloat(s) / (s.includes('.') && parseFloat(s) < 1 ? 1 : 100) || 0; })(),
     saves: n(gv(row, 'Zillow Saves', 'ZSaves', 'Zillow_Saves', 'Saves', 'Z Saves')), zViews: n(gv(row, 'Zillow Views', 'ZViews', 'Zillow_Views', 'Views', 'Z Views', 'Zillow Page Views', 'Page Views', 'Property Views', 'Listing Views', 'Zillow Property Views', 'Total Views', 'Zillow Last 30 Days')), mlsSaves: n(gv(row, 'MLS Saves')),
     zillowLink: gv(row, 'Zillow Link', 'Zillow URL', 'zillow link') || '',
@@ -752,7 +752,7 @@ function enrichListingsFromPriceDrop() {
     if (n(pd['Under Contract Price'])) l.contractP = n(pd['Under Contract Price']);
     // Spread = current list price − contract price (straight math, not from a "Profit" column).
     // Recompute here in case enrichment updated either value.
-    l.profit = (l.listP && l.contractP) ? (l.listP - l.contractP) : null;
+    l.profit = l.listP ? (l.contractP ? l.listP - l.contractP : l.listP) : null;
     if (drops.length >= 2) l.lastListP = drops[drops.length - 2].price;
     l.drops = drops.length;
     if (pd['Date of Last Price Update']) {
@@ -942,8 +942,8 @@ function aggregateInboundLeads(leads) {
     const src = (r['Buyer Lead Source'] || r['Lead Source'] || '').toString().trim() || 'Unknown';
     if (!map[src]) map[src] = {
       source: src, total: 0,
-      sourced: 0, appt: 0, qual: 0, noEmd: 0, emd: 0,
-      sourcedLeads: [], apptLeads: [], qualLeads: [], noEmdLeads: [], emdLeads: []
+      sourced: 0, appt: 0, qual: 0, contractSent: 0, noEmd: 0, emd: 0,
+      sourcedLeads: [], apptLeads: [], qualLeads: [], contractSentLeads: [], noEmdLeads: [], emdLeads: []
     };
     const cats = categorizeInboundStatus(r['Lead Status']);
     const lead = {
@@ -960,6 +960,9 @@ function aggregateInboundLeads(leads) {
     if (cats.sourced) { map[src].sourced++; map[src].sourcedLeads.push(lead); }
     if (cats.appt)    { map[src].appt++;    map[src].apptLeads.push(lead); }
     if (cats.qual)    { map[src].qual++;    map[src].qualLeads.push(lead); }
+    // Contract Sent — read directly from the cumulative flag column. categorizeInboundStatus()
+    // doesn't have a distinct contractSent tier, so we trust the raw CSV value.
+    if (parseInt(r['Contract Sent'] || 0) > 0) { map[src].contractSent++; map[src].contractSentLeads.push(lead); }
     if (cats.noEmd)   { map[src].noEmd++;   map[src].noEmdLeads.push(lead); }
     if (cats.emd)     { map[src].emd++;     map[src].emdLeads.push(lead); }
   });
@@ -2281,6 +2284,46 @@ function showCard(id) {
         })()}
       </div>
 
+      <!-- TOTAL FUNNEL (Inbound + Outbound combined) -->
+      <div class="sec">
+        ${(() => {
+          // Combine every lead recorded against this listing across both pipelines.
+          // The CSV stage flag columns are cumulative (a "Qualified" lead has 1 in
+          // Sourced + Appointment Set + Qualified), so counting `parseInt(flag) > 0`
+          // for each column produces a true funnel.
+          const allLeads = [
+            ...(l.mainListing ? getInboundLeads(l.mainListing) : []),
+            ...(l.mainListing ? getOutboundLeads(l.mainListing) : [])
+          ];
+          const totals = {
+            sourced: allLeads.filter(r => parseInt(r['Sourced']    || 0) > 0).length,
+            appt:    allLeads.filter(r => parseInt(r['Appointment Set'] || 0) > 0).length,
+            qual:    allLeads.filter(r => parseInt(r['Qualified'] || 0) > 0).length,
+            cs:      allLeads.filter(r => parseInt(r['Contract Sent']   || 0) > 0).length,
+            noEmd:   allLeads.filter(r => parseInt(r['UC w/o EMD']      || 0) > 0).length,
+            emd:     allLeads.filter(r => parseInt(r['UC w/ EMD']       || 0) > 0).length,
+          };
+          const stages = [
+            { label: 'Sourced',      value: totals.sourced, color: 'var(--text)' },
+            { label: 'Appt set',     value: totals.appt,    color: 'var(--text)' },
+            { label: 'Qualified',    value: totals.qual,    color: 'var(--text)' },
+            { label: 'Contract sent',value: totals.cs,      color: 'var(--text)' },
+            { label: 'UC w/o EMD',   value: totals.noEmd,   color: 'var(--text)' },
+            { label: 'UC w/ EMD',    value: totals.emd,     color: totals.emd > 0 ? 'var(--green-text)' : 'var(--text)' },
+          ];
+          return `
+            <div class="sec-title">Total funnel · ${allLeads.length} lead${allLeads.length === 1 ? '' : 's'} · inbound + outbound</div>
+            <div style="display:grid;grid-template-columns:repeat(6, 1fr);gap:12px">
+              ${stages.map(s => `
+                <div style="background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r-md);padding:14px 16px">
+                  <div style="font-size:14px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">${s.label}</div>
+                  <div style="font-size:28px;font-weight:700;color:${s.color};line-height:1">${s.value}</div>
+                </div>
+              `).join('')}
+            </div>`;
+        })()}
+      </div>
+
       <!-- INBOUND -->
       <div class="sec">
         ${(() => {
@@ -2337,7 +2380,7 @@ function showCard(id) {
               if (leadList.length === 0) return '';
               const safeKey = safeBase + suffix;
               return `<tr id="leads_${safeKey}" style="display:none">
-                <td colspan="6" style="padding:8px 8px 12px 32px;background:var(--bg3);border-bottom:0.5px solid var(--border)">
+                <td colspan="9" style="padding:8px 8px 12px 32px;background:var(--bg3);border-bottom:0.5px solid var(--border)">
                   <table style="width:100%;font-size:14px;border-collapse:collapse;background:var(--bg2);border-radius:6px;overflow:hidden;table-layout:fixed">
                     <thead><tr style="background:var(--bg3)">
                       <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;width:14%">Name</th>
@@ -2364,27 +2407,33 @@ function showCard(id) {
 
             return `<tr>
               <td><span class="badge ${inboundBadgeClass(c.source)}">${c.source}</span></td>
+              <td style="color:var(--text3)">—</td>
+              <td style="text-align:center">${c.total}</td>
               <td style="text-align:center">${mkBtn(c.sourced, c.sourcedLeads, 's')}</td>
               <td style="text-align:center">${mkBtn(c.appt, c.apptLeads, 'a')}</td>
               <td style="text-align:center">${mkBtn(c.qual, c.qualLeads, 'q')}</td>
-              <td style="text-align:center">${mkBtn(c.noEmd, c.noEmdLeads, 'n')}</td>
+              <td style="text-align:center">${mkBtn(c.contractSent, c.contractSentLeads, 'c')}</td>
               <td style="text-align:center;color:${c.emd > 0 ? 'var(--green-text)' : 'var(--text3)'}">${mkBtn(c.emd, c.emdLeads, 'e')}</td>
+              <td>${l.pod || '<span style="color:var(--text3)">—</span>'}</td>
             </tr>
             ${mkDetail(c.sourcedLeads, 's')}
             ${mkDetail(c.apptLeads, 'a')}
             ${mkDetail(c.qualLeads, 'q')}
-            ${mkDetail(c.noEmdLeads, 'n')}
+            ${mkDetail(c.contractSentLeads, 'c')}
             ${mkDetail(c.emdLeads, 'e')}`;
           }).join('') + `
             <tr style="border-top:2px solid var(--border);background:var(--bg3)">
               <td style="font-weight:700;font-size:14px">TOTAL</td>
+              <td></td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.total,0)}</td>
               <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.sourced,0)}</td>
               <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.appt,0)}</td>
               <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.qual,0)}</td>
-              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.noEmd,0)}</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.contractSent,0)}</td>
               <td style="text-align:center;font-weight:700;color:var(--green-text)">${channels.reduce((s,c) => s+c.emd,0)}</td>
+              <td></td>
             </tr>`
-          : `<tr><td colspan="6"><div class="no-data">${ibOk ? 'No inbound leads recorded yet for this listing' : 'Inbound leads file not loaded'}</div></td></tr>`;
+          : `<tr><td colspan="9"><div class="no-data">${ibOk ? 'No inbound leads recorded yet for this listing' : 'Inbound leads file not loaded'}</div></td></tr>`;
 
           return `
             <div class="sec-title">Inbound${totalInbound > 0 ? ' · ' + totalInbound + ' total leads' : ''}</div>
@@ -2392,7 +2441,7 @@ function showCard(id) {
             <div class="data-tbl-wrap">
               <table class="data-tbl">
                 <thead><tr>
-                  <th>Source</th><th style="text-align:center">Sourced</th><th style="text-align:center">Appt set</th><th style="text-align:center">Qualified</th><th style="text-align:center">w/o EMD</th><th style="text-align:center">w/ EMD</th>
+                  <th>Source</th><th>Date</th><th style="text-align:center">Members</th><th style="text-align:center">Sourced</th><th style="text-align:center">Appt set</th><th style="text-align:center">Qualified</th><th style="text-align:center">Contract sent</th><th style="text-align:center">UC w/ EMD</th><th>POD</th>
                 </tr></thead>
                 <tbody>${rowsHtml}</tbody>
               </table>
