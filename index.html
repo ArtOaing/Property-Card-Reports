@@ -77,7 +77,7 @@
   .sm-v.red { color: var(--red-text); } .sm-v.amber { color: var(--amber-text); } .sm-v.green { color: var(--green-text); }
 
   /* ── FILTERS ── */
-  .filter-bar { background: var(--bg); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 6px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
+  .filter-bar { background: var(--bg); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 6px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; align-items: center; }
   .filter-section { background: var(--bg); border-radius: var(--r-md); padding: 10px 14px; margin-bottom: 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .filter-label { font-size:15px; color: var(--text); text-transform: uppercase; letter-spacing: 0.06em; margin-right: 4px; font-weight: 700; }
   .filter-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
@@ -86,7 +86,8 @@
   .fb.on { background: var(--blue-bg); color: var(--blue-text); border-color: var(--blue-border); font-weight: 600; }
 
   /* Filter field — label + dropdown pair */
-  .ff { display: inline-flex; align-items: center; gap: 8px; }
+  .ff { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ff .dd { flex: 1; min-width: 0; }
 
   /* Custom dropdown component (handles both single-select and multi-select) */
   .dd { position: relative; display: inline-block; }
@@ -378,8 +379,6 @@
           <div class="dd-panel" id="listingStatusDropdownPanel"></div>
         </div>
       </div>
-      <!-- Force a wrap to the next row so we get exactly 5 filters per row -->
-      <div style="flex-basis:100%;height:0;margin:0;padding:0"></div>
       <!-- Expiry — single-select -->
       <div class="ff">
         <span class="filter-label">Expiry</span>
@@ -2380,7 +2379,7 @@ function showCard(id) {
               if (leadList.length === 0) return '';
               const safeKey = safeBase + suffix;
               return `<tr id="leads_${safeKey}" style="display:none">
-                <td colspan="9" style="padding:8px 8px 12px 32px;background:var(--bg3);border-bottom:0.5px solid var(--border)">
+                <td colspan="8" style="padding:8px 8px 12px 32px;background:var(--bg3);border-bottom:0.5px solid var(--border)">
                   <table style="width:100%;font-size:14px;border-collapse:collapse;background:var(--bg2);border-radius:6px;overflow:hidden;table-layout:fixed">
                     <thead><tr style="background:var(--bg3)">
                       <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;width:14%">Name</th>
@@ -2407,12 +2406,11 @@ function showCard(id) {
 
             return `<tr>
               <td><span class="badge ${inboundBadgeClass(c.source)}">${c.source}</span></td>
-              <td style="color:var(--text3)">—</td>
-              <td style="text-align:center">${c.total}</td>
               <td style="text-align:center">${mkBtn(c.sourced, c.sourcedLeads, 's')}</td>
               <td style="text-align:center">${mkBtn(c.appt, c.apptLeads, 'a')}</td>
               <td style="text-align:center">${mkBtn(c.qual, c.qualLeads, 'q')}</td>
               <td style="text-align:center">${mkBtn(c.contractSent, c.contractSentLeads, 'c')}</td>
+              <td style="text-align:center">${mkBtn(c.noEmd, c.noEmdLeads, 'n')}</td>
               <td style="text-align:center;color:${c.emd > 0 ? 'var(--green-text)' : 'var(--text3)'}">${mkBtn(c.emd, c.emdLeads, 'e')}</td>
               <td>${l.pod || '<span style="color:var(--text3)">—</span>'}</td>
             </tr>
@@ -2420,20 +2418,20 @@ function showCard(id) {
             ${mkDetail(c.apptLeads, 'a')}
             ${mkDetail(c.qualLeads, 'q')}
             ${mkDetail(c.contractSentLeads, 'c')}
+            ${mkDetail(c.noEmdLeads, 'n')}
             ${mkDetail(c.emdLeads, 'e')}`;
           }).join('') + `
             <tr style="border-top:2px solid var(--border);background:var(--bg3)">
               <td style="font-weight:700;font-size:14px">TOTAL</td>
-              <td></td>
-              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.total,0)}</td>
               <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.sourced,0)}</td>
               <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.appt,0)}</td>
               <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.qual,0)}</td>
               <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.contractSent,0)}</td>
+              <td style="text-align:center;font-weight:700">${channels.reduce((s,c) => s+c.noEmd,0)}</td>
               <td style="text-align:center;font-weight:700;color:var(--green-text)">${channels.reduce((s,c) => s+c.emd,0)}</td>
               <td></td>
             </tr>`
-          : `<tr><td colspan="9"><div class="no-data">${ibOk ? 'No inbound leads recorded yet for this listing' : 'Inbound leads file not loaded'}</div></td></tr>`;
+          : `<tr><td colspan="8"><div class="no-data">${ibOk ? 'No inbound leads recorded yet for this listing' : 'Inbound leads file not loaded'}</div></td></tr>`;
 
           return `
             <div class="sec-title">Inbound${totalInbound > 0 ? ' · ' + totalInbound + ' total leads' : ''}</div>
@@ -2441,7 +2439,7 @@ function showCard(id) {
             <div class="data-tbl-wrap">
               <table class="data-tbl">
                 <thead><tr>
-                  <th>Source</th><th>Date</th><th style="text-align:center">Members</th><th style="text-align:center">Sourced</th><th style="text-align:center">Appt set</th><th style="text-align:center">Qualified</th><th style="text-align:center">Contract sent</th><th style="text-align:center">UC w/ EMD</th><th>POD</th>
+                  <th>Source</th><th style="text-align:center">Sourced</th><th style="text-align:center">Appt set</th><th style="text-align:center">Qualified</th><th style="text-align:center">Contract sent</th><th style="text-align:center">UC w/o EMD</th><th style="text-align:center">UC w/ EMD</th><th>POD</th>
                 </tr></thead>
                 <tbody>${rowsHtml}</tbody>
               </table>
@@ -2474,8 +2472,9 @@ function showCard(id) {
         </div>
       </div>
 
-      <!-- SALES FEEDBACK -->
-      <div class="sec">
+      <!-- SALES FEEDBACK — hidden per user request ("remove for now"). Remove the inline
+           style:display:none to bring it back. -->
+      <div class="sec" style="display:none">
         <div class="sec-title">Sales feedback</div>
         ${lf.length > 0 ? lf.sort((a, b) => new Date(b['Date'] || 0) - new Date(a['Date'] || 0)).map(fb => {
           const pod = fb['POD'] || fb['Closer'] || l.pod || '';
