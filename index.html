@@ -1390,7 +1390,6 @@ function showCard(id) {
                   <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;width:11%">Status</th>
                   <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;width:9%">Source</th>
                   <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;width:11%">Appt scheduled</th>
-                  <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Buyer's feedback</th>
                   <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Sales notes</th>
                 </tr></thead>
                 <tbody>
@@ -1399,7 +1398,6 @@ function showCard(id) {
                     <td style="padding:8px 14px;color:var(--text2);word-wrap:break-word">${escapeHtml(r.status)}</td>
                     <td style="padding:8px 14px;color:var(--text3);word-wrap:break-word">${escapeHtml(r.source)}</td>
                     <td style="padding:8px 14px;color:${r.apptSched ? 'var(--blue-text)' : 'var(--text3)'};font-weight:${r.apptSched ? '500' : '400'};word-wrap:break-word">${escapeHtml(r.apptSched || '—')}</td>
-                    <td style="padding:8px 14px;color:var(--text2);word-wrap:break-word;white-space:pre-wrap">${r.feedback ? escapeHtml(r.feedback) : '<span style="color:var(--text3)">—</span>'}</td>
                     <td style="padding:8px 14px;color:var(--text2);word-wrap:break-word;white-space:pre-wrap">${r.notes ? escapeHtml(r.notes) : '<span style="color:var(--text3)">—</span>'}</td>
                   </tr>`).join('')}
                 </tbody>
@@ -2386,7 +2384,6 @@ function showCard(id) {
                       <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;width:11%">Status</th>
                       <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;width:9%">Source</th>
                       <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em;width:11%">Appt scheduled</th>
-                      <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Buyer's feedback</th>
                       <th style="padding:7px 14px;text-align:left;font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.04em">Sales notes</th>
                     </tr></thead>
                     <tbody>
@@ -2395,7 +2392,6 @@ function showCard(id) {
                         <td style="padding:8px 14px;color:var(--text2);word-wrap:break-word">${escapeHtml(r.status)}</td>
                         <td style="padding:8px 14px;color:var(--text3);word-wrap:break-word">${escapeHtml(r.source)}</td>
                         <td style="padding:8px 14px;color:${r.apptSched ? 'var(--blue-text)' : 'var(--text3)'};font-weight:${r.apptSched ? '500' : '400'};word-wrap:break-word">${escapeHtml(r.apptSched || '—')}</td>
-                        <td style="padding:8px 14px;color:var(--text2);word-wrap:break-word;white-space:pre-wrap">${r.feedback ? escapeHtml(r.feedback) : '<span style="color:var(--text3)">—</span>'}</td>
                         <td style="padding:8px 14px;color:var(--text2);word-wrap:break-word;white-space:pre-wrap">${r.notes ? escapeHtml(r.notes) : '<span style="color:var(--text3)">—</span>'}</td>
                       </tr>`).join('')}
                     </tbody>
