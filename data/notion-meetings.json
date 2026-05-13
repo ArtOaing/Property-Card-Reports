@@ -1,5 +1,5 @@
 {
-  "lastSynced": "2026-05-13T18:06:12.761614+00:00",
+  "lastSynced": "2026-05-13T21:39:38.277066+00:00",
   "transactionPropertyName": "Transaction",
   "databaseId": "b90c1ecab1f9414cbf4792ac34126d00",
   "byTransaction": {
@@ -363,6 +363,18 @@
       "notionPageId": "3580bd65-db0b-804e-9a28-e264fb7c4f85",
       "notionUrl": "https://www.notion.so/TR-SC-063925-3580bd65db0b804e9a28e264fb7c4f85",
       "meetings": [
+        {
+          "type": "Portfolio Review",
+          "date": "2026-05-13",
+          "label": "📊 Portfolio Review — 2026-05-13",
+          "bullets": [
+            "🏷️ TR-SC-063925 · Closer: Jose Membreno",
+            "THIS WEEK'S DECISIONS",
+            "Strategic pivot: terminate (per Anshul confirmation)",
+            "🎤 Source: Portfolio Review & Marketing Updates (Fireflies) — TEST"
+          ],
+          "blockId": "bde224e1-a611-4c74-ab04-cd918ea5aa64"
+        },
         {
           "type": "Portfolio Review",
           "date": "2026-05-06",
