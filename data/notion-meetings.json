@@ -1,5 +1,5 @@
 {
-  "lastSynced": "2026-05-16T22:54:55.676390+00:00",
+  "lastSynced": "2026-05-17T04:00:15.980799+00:00",
   "transactionPropertyName": "Transaction",
   "databaseId": "b90c1ecab1f9414cbf4792ac34126d00",
   "byTransaction": {
@@ -225,40 +225,6 @@
             "Property Timeline"
           ],
           "blockId": "52599dbc-9540-4397-bd3a-350c36c1572b"
-        }
-      ]
-    },
-    "TR-SC-065405": {
-      "notionPageId": "3580bd65-db0b-80cd-a4f3-f1d2e8c58d8b",
-      "notionUrl": "https://www.notion.so/TR-SC-065405-3580bd65db0b80cda4f3f1d2e8c58d8b",
-      "meetings": [
-        {
-          "type": "Portfolio Review",
-          "date": "2026-05-13",
-          "label": "📊 Portfolio Review — 2026-05-13",
-          "bullets": [
-            "🏷️ TR-SC-065405 · Closer: Gabriel Santos",
-            "THIS WEEK'S DECISIONS",
-            "Price drop: set to $59,900",
-            "🎤 Source: https://app.fireflies.ai/view/01KQZ8BQ5MRYATNSYVKFBXKFHM"
-          ],
-          "blockId": "92397e22-aeb1-4e1a-9084-8973d81e3bce"
-        },
-        {
-          "type": "Portfolio Review",
-          "date": "2026-05-06",
-          "label": "📊 Portfolio Review — 2026-05-06",
-          "bullets": [
-            "🏷️ TR-SC-065405 · Closer: Gabriel Santos",
-            "THIS WEEK'S DECISIONS",
-            "Price drop: → $65,900 (final clarified)",
-            "BLOCKERS",
-            "Non-conventional septic quoted $30k–$50k; use to negotiate if buyer emerges",
-            "ACTION ITEMS",
-            "Update listing price to $65,900 across channels — Ellyse Mae — Due: 2026-05-07",
-            "🎤 Source: https://app.fireflies.ai/view/01KQZ1N2JDG1V0QRR277CMCHYC"
-          ],
-          "blockId": "7d676aab-cc75-4bf6-82ce-62a4458a9a6f"
         }
       ]
     },
